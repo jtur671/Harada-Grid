@@ -1,73 +1,125 @@
-# React + TypeScript + Vite
+# Harada Grid – Local Goal Planner
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A local-first goal-setting app that digitizes the **Harada Method**: one big goal, 8 pillars, 8 actions each, and a daily diary.
 
-Currently, two official plugins are available:
+This project replaces the default Vite/React README with a focused explanation of how the app works and how to run it.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 🧠 What is this?
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The Harada Method is a Japanese goal-setting technique that takes:
 
-## Expanding the ESLint configuration
+- **1 big goal**
+- **8 supporting pillars**
+- **8 small actions per pillar**
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+…and lays them out in a 64-cell grid. This app turns that system into a simple, local web app with:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- An **Edit** view for designing your Harada grid
+- A **View** (traditional) view that looks like the classic 9×9 Harada sheet
+- A **Daily Diary** and **history** so you can track what actually happened
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+All data is stored in **localStorage**. No backend, no sync, no accounts—just your browser.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## ✨ Core Features
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 1. Goal + Pillar Editor (Edit mode)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- Define your **main goal** in the center “Goal” card.
+- Create **8 pillars** (e.g., “Health”, “Career Shift”, “Finances”…).
+- For each pillar, add **8 concrete actions** (daily/regular habits).
+- UI is optimised for editing:
+  - Pillar cards across the top
+  - A detail panel showing the 8 actions for the selected pillar
+
+### 2. Traditional Harada Grid (View mode)
+
+- Renders a **9×9 grid** with:
+  - Center cell = Main Goal  
+  - 8 black pillar cells around the center  
+  - 64 action cells on the outer ring
+- Behaviors:
+  - **Click a pillar** to collapse/expand its block (for a cleaner view).
+  - **Click an action** to toggle it as **Done** for today.
+    - Done actions turn green and appear in your daily progress.
+
+### 3. Daily Progress Bar
+
+- In View mode, a progress section shows:
+  - `completed / total` defined actions for today
+  - A progress bar that fills as you check off tasks
+  - 8 small pillar dots that light up when all actions for that pillar are done
+
+### 4. Daily Diary + History
+
+- Each day has:
+  - A **diary entry** (free-form text)
+  - **Action checkmarks** (which actions were done)
+- A **Diary History** section:
+  - Shows past days with a summary:
+    - `Completed full grid`
+    - `Completed X actions`
+    - `No actions completed`
+  - Each day can be expanded to read the diary entry.
+  - Older entries are grouped and can be expanded/collapsed.
+
+### 5. Templates
+
+- **Templates** button in Edit mode:
+  - Open a modal with a set of predefined goal systems.
+  - Applying a template:
+    - Overwrites **goal, pillars, and actions**.
+    - Keeps **diary entries and completion history**.
+
+### 6. AI Templates (stub)
+
+- **Templates (AI)** button in Edit mode:
+  - Opens a modal with a text box for your main goal.
+  - Currently logs the goal to the console as a placeholder.
+  - Intended to be wired up to the OpenAI API later to auto-generate pillars and actions.
+
+### 7. Reset All
+
+- **Reset All** button in Edit mode:
+  - Opens a confirmation modal.
+  - Clears:
+    - Main goal
+    - Pillars & actions
+    - Diary entries
+    - Progress/completion history
+
+### 8. Export / Print (Traditional View)
+
+- **Export / Print** button (View mode only):
+  - Uses a print-optimized layout:
+    - **Page 1:** Daily Diary & history
+    - **Page 2:** Full Harada grid on its own page
+  - Completed actions are clearly visible:
+    - Green background
+    - A ✓ checkmark added before the text
+
+---
+
+## 🛠 Tech Stack
+
+- **React** (TypeScript)
+- **Vite** (build tooling + dev server)
+- **LocalStorage** for persistence
+- **Plain CSS** (no Tailwind/Chakra/etc.)
+- No backend, no auth, no external DBs
+
+---
+
+## 🚀 Getting Started
+
+### 1. Install dependencies
+
+```bash
+npm install
+# or
+pnpm install
+# or
+yarn
