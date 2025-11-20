@@ -21,8 +21,14 @@ import { TraditionalGrid } from "./components/TraditionalGrid";
 import { supabase } from "./supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
-type AppView = "home" | "builder" | "harada";
+type AppView = "home" | "builder" | "harada" | "dashboard";
 type AuthView = "login" | "signup" | null;
+
+type ProjectSummary = {
+  id: string;
+  title: string | null;
+  updated_at: string;
+};
 
 type ExampleId = "career" | "sidebiz" | "wellbeing";
 
@@ -50,7 +56,7 @@ const App: React.FC = () => {
   const [state, setState] = useState<HaradaState>(() => loadState());
   const [selectedDate] = useState<string>(todayISO()); // static "today"
   const [activePillar, setActivePillar] = useState<number>(0);
-  const [viewMode, setViewMode] = useState<"map" | "grid">("map");
+  const [viewMode, setViewMode] = useState<"map" | "grid">("grid");
   const [collapsedPillars, setCollapsedPillars] = useState<boolean[]>(() =>
     Array(8).fill(false)
   );
@@ -67,6 +73,7 @@ const App: React.FC = () => {
   const [aiModalOpen, setAiModalOpen] = useState<boolean>(false);
   const [aiGoalText, setAiGoalText] = useState<string>("");
   const [resetOpen, setResetOpen] = useState<boolean>(false);
+  const [startModalOpen, setStartModalOpen] = useState<boolean>(false);
 
   const [exampleId, setExampleId] = useState<ExampleId>("career");
   const [exampleState, setExampleState] = useState<HaradaState>(() =>
@@ -74,23 +81,45 @@ const App: React.FC = () => {
   );
 
   const [appView, setAppView] = useState<AppView>("home");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authView, setAuthView] = useState<AuthView>(null);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [user, setUser] = useState<User | null>(null);
+  const [authView, setAuthView] = useState<AuthView>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const isLoggedIn = !!user;
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
+  const isAdmin = !!user && !!adminEmail && user.email === adminEmail;
+
+  const loadProjectsForUser = async (u: User) => {
+    const { data, error } = await supabase
+      .from("action_maps")
+      .select("id,title,updated_at")
+      .eq("user_id", u.id)
+      .order("updated_at", { ascending: false });
+
+    if (error) {
+      console.error("Failed to load projects", error);
+      return;
+    }
+
+    const list = (data ?? []) as ProjectSummary[];
+    setProjects(list);
+
+    if (list.length === 0) {
+      // Brand-new user: go straight to builder, show onboarding modal once
+      setAppView("builder");
+      setViewMode("grid");
+      setStartModalOpen(true);
+    } else {
+      // Returning user: land on dashboard
+      setAppView("dashboard");
+      setStartModalOpen(false);
+    }
+  };
 
   const handleExampleChange = (id: ExampleId) => {
     setExampleId(id);
     setExampleState(buildExampleState(id));
-  };
-
-  const handleUiLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error("Error signing out:", error);
-    } finally {
-      setIsLoggedIn(false);
-    }
   };
 
   useEffect(() => {
@@ -99,21 +128,31 @@ const App: React.FC = () => {
 
   // Load current session + watch for changes
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        setUser(data.session?.user ?? null);
-      } catch (error) {
-        console.error("Error loading session:", error);
+    supabase.auth.getSession().then(({ data }) => {
+      const current = data.session?.user ?? null;
+      setUser(current);
+      if (current) {
+        // Decide whether to show builder+modal or dashboard
+        loadProjectsForUser(current);
+      } else {
+        setAppView("home");
+        setProjects([]);
+        setStartModalOpen(false);
       }
-    };
-
-    initAuth();
+    });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) {
+        loadProjectsForUser(u);
+      } else {
+        setAppView("home");
+        setProjects([]);
+        setStartModalOpen(false);
+      }
     });
 
     return () => {
@@ -146,13 +185,9 @@ const App: React.FC = () => {
     loadFromCloud();
   }, [user]);
 
-  useEffect(() => {
-    setIsLoggedIn(!!user);
-  }, [user]);
-
   // Auto-save grid to Supabase for logged-in users
   useEffect(() => {
-    if (!user) return;
+    if (!isLoggedIn || !user) return;
 
     const timeoutId = window.setTimeout(async () => {
       try {
@@ -302,13 +337,14 @@ const App: React.FC = () => {
           <>
             <h2 className="auth-title">Log in</h2>
             <p className="auth-subtitle">
-              Use your email and password. (Email magic handled by Supabase.)
+              Log in to access your saved Action Maps.
             </p>
-
+            {authError && <p className="auth-error">{authError}</p>}
             <form
               className="auth-form"
               onSubmit={async (e) => {
                 e.preventDefault();
+                setAuthError(null);
                 const formData = new FormData(e.currentTarget);
                 const email = (formData.get("email") as string)?.trim();
                 const password = (formData.get("password") as string)?.trim();
@@ -319,10 +355,11 @@ const App: React.FC = () => {
                   password,
                 });
 
-                if (!error) {
-                  setAuthView(null);
+                if (error) {
+                  setAuthError(error.message);
                 } else {
-                  console.error(error.message);
+                  setAuthView(null);
+                  // onAuthStateChange will call loadProjectsForUser and pick builder vs dashboard
                 }
               }}
             >
@@ -348,8 +385,11 @@ const App: React.FC = () => {
             <button
               type="button"
                 className="auth-switch"
-                onClick={() => setAuthView("signup")}
-            >
+                onClick={() => {
+                  setAuthError(null);
+                  setAuthView("signup");
+                }}
+              >
                 Need an account? Sign up
             </button>
             </form>
@@ -358,28 +398,36 @@ const App: React.FC = () => {
           <>
             <h2 className="auth-title">Sign up</h2>
             <p className="auth-subtitle">
-              Create an Action Maps account. You&apos;ll be able to save your grid.
+              Create a free Action Maps account so your grids are saved.
             </p>
-
+            {authError && <p className="auth-error">{authError}</p>}
             <form
               className="auth-form"
               onSubmit={async (e) => {
                 e.preventDefault();
+                setAuthError(null);
                 const formData = new FormData(e.currentTarget);
                 const email = (formData.get("email") as string)?.trim();
                 const password = (formData.get("password") as string)?.trim();
                 const confirm = (formData.get("confirm") as string)?.trim();
-                if (!email || !password || password !== confirm) return;
+                if (!email || !password || password !== confirm) {
+                  if (password !== confirm) {
+                    setAuthError("Passwords do not match.");
+                  }
+                  return;
+                }
 
                 const { error } = await supabase.auth.signUp({
                   email,
                   password,
                 });
 
-                if (!error) {
-                  setAuthView(null);
+                if (error) {
+                  setAuthError(error.message);
                 } else {
-                  console.error(error.message);
+                  // Depending on Supabase settings, user may need email confirmation
+                  setAuthView(null);
+                  // new user -> no projects -> builder + modal
                 }
               }}
             >
@@ -410,13 +458,16 @@ const App: React.FC = () => {
 
               <button type="submit" className="auth-submit">
                 Create account
-                </button>
+            </button>
 
                 <button
                   type="button"
                 className="auth-switch"
-                onClick={() => setAuthView("login")}
-                >
+                onClick={() => {
+                  setAuthError(null);
+                  setAuthView("login");
+                }}
+              >
                 Already have an account? Log in
                 </button>
             </form>
@@ -426,7 +477,7 @@ const App: React.FC = () => {
     </div>
   ) : null;
 
-  if (appView === "harada") {
+  if (appView === "dashboard") {
     return (
       <div className="app builder-app">
         <div className="builder-shell">
@@ -439,13 +490,175 @@ const App: React.FC = () => {
             </div>
 
             <nav className="home-nav-actions">
+              {isLoggedIn && user?.email ? (
+                <>
+                  {isAdmin && <span className="home-nav-user-pill">Admin</span>}
+                  {!isAdmin && (
+                    <span className="home-nav-user-pill">{user.email}</span>
+                  )}
                 <button
                   type="button"
                   className="home-nav-link"
+                  onClick={() => supabase.auth.signOut()}
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="home-nav-link"
+                    onClick={() => {
+                      setAuthError(null);
+                      setAuthView("login");
+                    }}
+                >
+                  Log in
+                </button>
+                <button
+                  type="button"
+                  className="home-nav-cta"
+                    onClick={() => {
+                      setAuthError(null);
+                      setAuthView("signup");
+                    }}
+                >
+                  Sign up
+                </button>
+              </>
+            )}
+          </nav>
+        </header>
+
+          <main className="dashboard-main">
+            <div className="dashboard-header">
+              <div>
+                <h1 className="dashboard-title">Your Action Maps</h1>
+                <p className="dashboard-subtitle">
+                  Open an existing map or start a new one.
+                </p>
+              </div>
+                <button
+                  type="button"
+                  className="hero-primary-cta"
+                onClick={() => {
+                  // new blank map + onboarding modal again
+                  setState(createEmptyState());
+                  setViewMode("grid");
+                  setStartModalOpen(true);
+                  setAppView("builder");
+                }}
+              >
+                New map
+                </button>
+            </div>
+
+            {projects.length === 0 ? (
+              <p className="dashboard-empty">
+                You don&apos;t have any saved maps yet. Start a new one to see it
+                here next time.
+              </p>
+            ) : (
+              <div className="dashboard-grid">
+                {projects.map((p) => (
+                <button
+                    key={p.id}
+                    className="dashboard-card"
+                  type="button"
+                    onClick={async () => {
+                      // Load this project and jump into builder (View mode)
+                      const { data, error } = await supabase
+                        .from("action_maps")
+                        .select("state")
+                        .eq("id", p.id)
+                        .single();
+
+                      if (!error && data?.state) {
+                        setState(data.state as HaradaState);
+                        setViewMode("grid");
+                        setStartModalOpen(false);
+                        setAppView("builder");
+                      }
+                    }}
+                  >
+                    <h2 className="dashboard-card-title">
+                      {p.title || "Untitled map"}
+                    </h2>
+                    <p className="dashboard-card-meta">
+                      Updated {new Date(p.updated_at).toLocaleDateString()}
+                    </p>
+                </button>
+                ))}
+              </div>
+            )}
+          </main>
+
+          {authOverlay}
+              </div>
+            </div>
+    );
+  }
+
+  if (appView === "harada") {
+    return (
+      <div className="app builder-app">
+        <div className="builder-shell">
+          <header className="home-nav">
+            <div className="home-logo">
+              <span className="home-logo-mark">◆</span>
+              <span className="home-logo-text">
+                Action<span>Maps</span>
+              </span>
+                </div>
+
+            <nav className="home-nav-actions">
+                <button
+                  type="button"
+                className="home-nav-link"
                 onClick={() => setAppView("home")}
                 >
                 ← Back
                 </button>
+
+              {isLoggedIn && user?.email ? (
+                <>
+                  {isAdmin && <span className="home-nav-user-pill">Admin</span>}
+                  {!isAdmin && (
+                    <span className="home-nav-user-pill">{user.email}</span>
+                  )}
+                <button
+                  type="button"
+                  className="home-nav-link"
+                  onClick={() => supabase.auth.signOut()}
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="home-nav-link"
+                    onClick={() => {
+                      setAuthError(null);
+                      setAuthView("login");
+                    }}
+                >
+                  Log in
+                </button>
+                <button
+                  type="button"
+                  className="home-nav-cta"
+                    onClick={() => {
+                      setAuthError(null);
+                      setAuthView("signup");
+                    }}
+                >
+                  Sign up
+                </button>
+              </>
+            )}
           </nav>
         </header>
 
@@ -467,22 +680,22 @@ const App: React.FC = () => {
                   one ambitious goal and break it into focused areas and habits,
                   he saw dramatic improvements in results and confidence.
                 </p>
-              </section>
+          </section>
 
               <section className="info-section">
                 <h2>How it works</h2>
                 <ul>
                   <li>
                     You choose <strong>one main goal</strong> you want to achieve.
-                  </li>
+              </li>
                   <li>
                     You identify <strong>key pillars</strong> that support that
                     goal (skills, health, relationships, finances, etc.).
-                  </li>
+              </li>
                   <li>
                     You list out <strong>concrete actions</strong> under each
                     pillar and track them daily in a visual grid.
-                  </li>
+              </li>
                 </ul>
               </section>
 
@@ -491,7 +704,7 @@ const App: React.FC = () => {
                 <ul className="info-bullets">
                   <li>
                     It forces you to move from vague intentions to clear steps.
-                  </li>
+              </li>
                   <li>
                     The grid shows how all your actions connect to your goal.
                   </li>
@@ -500,7 +713,7 @@ const App: React.FC = () => {
                     main goal steady.
                   </li>
                 </ul>
-              </section>
+          </section>
 
               <section className="info-section">
                 <h2>How Action Maps adapts it</h2>
@@ -515,15 +728,15 @@ const App: React.FC = () => {
               </section>
 
               <div className="info-ctas">
-                <button
-                  type="button"
+              <button
+                type="button"
                   className="hero-primary-cta"
                   onClick={() => setAppView("builder")}
                 >
                   Start your first map
-                </button>
-                <button
-                  type="button"
+              </button>
+              <button
+                type="button"
                   className="hero-secondary-cta hero-outline-cta info-secondary"
                   onClick={() => setAppView("home")}
                 >
@@ -550,35 +763,47 @@ const App: React.FC = () => {
             </div>
 
           <nav className="home-nav-actions">
-                <button
-                  type="button"
+            <button
+              type="button"
               className="home-nav-link"
-                onClick={() => setAppView("home")}
-                >
-                ← Back
-                </button>
+              onClick={() => setAppView("home")}
+            >
+              ← Back
+              </button>
 
-              {isLoggedIn ? (
+            {isLoggedIn && user?.email ? (
+              <>
+                {isAdmin && <span className="home-nav-user-pill">Admin</span>}
+                {!isAdmin && (
+                  <span className="home-nav-user-pill">{user.email}</span>
+                )}
               <button
                 type="button"
                   className="home-nav-link"
-                  onClick={handleUiLogout}
+                  onClick={() => supabase.auth.signOut()}
                 >
                   Log out
               </button>
+              </>
             ) : (
               <>
               <button
                 type="button"
                   className="home-nav-link"
-                  onClick={() => setAuthView("login")}
+                  onClick={() => {
+                    setAuthError(null);
+                    setAuthView("login");
+                  }}
                 >
                   Log in
               </button>
               <button
                 type="button"
                   className="home-nav-cta"
-                  onClick={() => setAuthView("signup")}
+                  onClick={() => {
+                    setAuthError(null);
+                    setAuthView("signup");
+                  }}
                 >
                   Sign up
               </button>
@@ -592,14 +817,17 @@ const App: React.FC = () => {
               <h1 className="builder-title">Your Action Map</h1>
               <div className="builder-status">
                 {isLoggedIn ? (
-                  <span>Changes will be saved to your account.</span>
+                  <span>Changes will be saved to your account automatically.</span>
                 ) : (
                   <span>
                     You&apos;re in demo mode.{" "}
-                <button
-                  type="button"
+                    <button
+                      type="button"
                       className="builder-status-link"
-                      onClick={() => setAuthView("signup")}
+                      onClick={() => {
+                        setAuthError(null);
+                        setAuthView("signup");
+                      }}
                     >
                       Sign up
                     </button>{" "}
@@ -743,6 +971,50 @@ const App: React.FC = () => {
       </main>
 
           {authOverlay}
+
+          {startModalOpen && (
+            <div className="start-overlay" role="dialog" aria-modal="true">
+              <div className="start-card">
+                <h2 className="start-title">How do you want to start?</h2>
+                <p className="start-subtitle">
+                  You&apos;re looking at the View mode right now. Choose how you
+                  want to build your first Action Map.
+                </p>
+
+                <div className="start-actions">
+              <button
+                type="button"
+                    className="start-btn-primary"
+                    onClick={() => {
+                      setViewMode("map"); // jump to Edit mode
+                      setStartModalOpen(false);
+                    }}
+                  >
+                    Fill it out yourself
+              </button>
+                  <button
+                    type="button"
+                    className="start-btn-secondary"
+                    onClick={() => {
+                      setStartModalOpen(false);
+                      setViewMode("map"); // edit mode so they can tweak
+                      setAiModalOpen(true); // open your existing AI helper modal
+                    }}
+                  >
+                    Use AI to create my board
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  className="start-skip"
+                  onClick={() => setStartModalOpen(false)}
+                >
+                  Skip for now
+                    </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -760,28 +1032,40 @@ const App: React.FC = () => {
           </div>
 
           <nav className="home-nav-actions">
-            {isLoggedIn ? (
-              <button
-                type="button"
-                  className="home-nav-link"
-                onClick={handleUiLogout}
-              >
-                  Log out
-              </button>
-            ) : (
+            {isLoggedIn && user?.email ? (
               <>
+                {isAdmin && <span className="home-nav-user-pill">Admin</span>}
+                {!isAdmin && (
+                  <span className="home-nav-user-pill">{user.email}</span>
+                )}
+                    <button
+                      type="button"
+                  className="home-nav-link"
+                  onClick={() => supabase.auth.signOut()}
+                    >
+                  Log out
+                    </button>
+                </>
+              ) : (
+                <>
                 <button
                   type="button"
                   className="home-nav-link"
-                  onClick={() => setAuthView("login")}
+                  onClick={() => {
+                    setAuthError(null);
+                    setAuthView("login");
+                  }}
                 >
                       Log in
                     </button>
                     <button
                       type="button"
                   className="home-nav-cta"
-                      onClick={() => setAuthView("signup")}
-                    >
+                  onClick={() => {
+                    setAuthError(null);
+                    setAuthView("signup");
+                  }}
+                >
                   Sign up
                     </button>
               </>
@@ -795,33 +1079,39 @@ const App: React.FC = () => {
               <p className="home-hero-kicker">Harada-inspired goal OS</p>
 
               <h1 className="home-hero-title">
-                Transform your goals
-                <br />
-                into Action Maps.
+                Don&apos;t let dreams stay in your dreams
               </h1>
 
               <p className="home-hero-subtitle">
-                Break down ambitious goals into 64 specific, trackable actions
-                using a modern take on the Harada Method—powered by AI templates
-                to help you get unstuck.
+                Turn your biggest goals into a clear, actionable plan. One goal,
+                8 pillars, 64 actions—all in one place, powered by AI to help you
+                get started in minutes.
               </p>
 
-              <div className="home-hero-ai-badge">
+              {/* AI highlight */}
+              <div className="home-hero-ai-card">
                 <span className="ai-pill">NEW</span>
-                <span>AI-assisted goal planning built into every map.</span>
+                <div className="home-hero-ai-text">
+                  <p className="home-hero-ai-title">AI-assisted goal planning</p>
+                  <p className="home-hero-ai-body">
+                    Tell us your goal in one sentence and let AI draft pillars and
+                    actions you can tweak in minutes.
+                  </p>
+                </div>
               </div>
 
+              {/* Main CTAs */}
               <div className="home-hero-ctas">
                 <button
                   type="button"
-                  className="hero-primary-cta"
+                  className="hero-primary-cta hero-primary-cta-large"
                   onClick={() => setAppView("builder")}
                 >
                   Get started free
                 </button>
                 <button
                   type="button"
-                  className="hero-secondary-cta"
+                  className="hero-secondary-cta hero-secondary-cta-large"
                   onClick={() =>
                     document
                       .getElementById("examples")
@@ -832,10 +1122,36 @@ const App: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  className="hero-secondary-cta hero-outline-cta"
+                  className="hero-secondary-cta hero-secondary-cta-large hero-outline-cta"
                   onClick={() => setAppView("harada")}
                 >
                   What is the Harada Method?
+                </button>
+              </div>
+
+              {/* Scroll CTAs for Why / How */}
+              <div className="home-hero-anchors">
+                <button
+                  type="button"
+                  className="hero-anchor-btn"
+                  onClick={() =>
+                    document
+                      .getElementById("why")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                >
+                  Why Action Maps?
+                </button>
+                <button
+                  type="button"
+                  className="hero-anchor-btn"
+                  onClick={() =>
+                    document
+                      .getElementById("how-it-works")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                >
+                  How it works
                 </button>
               </div>
 
