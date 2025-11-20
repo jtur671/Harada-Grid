@@ -6,9 +6,14 @@ type AuthView = "login" | "signup" | null;
 type AuthModalProps = {
   authView: AuthView;
   onClose: () => void;
+  onSwitchView: (view: "login" | "signup") => void;
 };
 
-export const AuthModal: React.FC<AuthModalProps> = ({ authView, onClose }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({
+  authView,
+  onClose,
+  onSwitchView,
+}) => {
   const [authError, setAuthError] = useState<string | null>(null);
 
   if (!authView) return null;
@@ -79,8 +84,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ authView, onClose }) => {
                 className="auth-switch"
                 onClick={() => {
                   setAuthError(null);
-                  // Switch to signup - this will be handled by parent
-                  // We need to pass a switch handler prop
+                  onSwitchView("signup");
                 }}
               >
                 Need an account? Sign up
@@ -158,7 +162,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ authView, onClose }) => {
                 className="auth-switch"
                 onClick={() => {
                   setAuthError(null);
-                  // Switch to login - this will be handled by parent
+                  onSwitchView("login");
                 }}
               >
                 Already have an account? Log in

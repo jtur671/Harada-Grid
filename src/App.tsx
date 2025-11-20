@@ -18,6 +18,8 @@ import { TemplateModal } from "./components/TemplateModal";
 import { AiHelperModal } from "./components/AiHelperModal";
 import { ResetModal } from "./components/ResetModal";
 import { TraditionalGrid } from "./components/TraditionalGrid";
+import { AuthModal } from "./components/AuthModal";
+import { DashboardPage } from "./components/DashboardPage";
 import { supabase } from "./supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
@@ -84,7 +86,6 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [authView, setAuthView] = useState<AuthView>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
 
   const isLoggedIn = !!user;
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
@@ -321,282 +322,20 @@ const App: React.FC = () => {
     setAiModalOpen(false);
   };
 
-  const authOverlay = authView ? (
-    <div className="auth-overlay" role="dialog" aria-modal="true">
-      <div className="auth-card">
-            <button
-              type="button"
-          className="auth-close"
-          aria-label="Close"
-          onClick={() => setAuthView(null)}
-        >
-          ×
-            </button>
-
-        {authView === "login" ? (
-          <>
-            <h2 className="auth-title">Log in</h2>
-            <p className="auth-subtitle">
-              Log in to access your saved Action Maps.
-            </p>
-            {authError && <p className="auth-error">{authError}</p>}
-            <form
-              className="auth-form"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setAuthError(null);
-                const formData = new FormData(e.currentTarget);
-                const email = (formData.get("email") as string)?.trim();
-                const password = (formData.get("password") as string)?.trim();
-                if (!email || !password) return;
-
-                const { error } = await supabase.auth.signInWithPassword({
-                  email,
-                  password,
-                });
-
-                if (error) {
-                  setAuthError(error.message);
-                } else {
-                  setAuthView(null);
-                  // onAuthStateChange will call loadProjectsForUser and pick builder vs dashboard
-                }
-              }}
-            >
-              <label className="auth-field">
-                <span>Email</span>
-                <input name="email" type="email" required autoComplete="email" />
-              </label>
-
-              <label className="auth-field">
-                <span>Password</span>
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                />
-              </label>
-
-              <button type="submit" className="auth-submit">
-                Log in
-            </button>
-
-            <button
-              type="button"
-                className="auth-switch"
-                onClick={() => {
-                  setAuthError(null);
-                  setAuthView("signup");
-                }}
-              >
-                Need an account? Sign up
-            </button>
-            </form>
-          </>
-        ) : (
-          <>
-            <h2 className="auth-title">Sign up</h2>
-            <p className="auth-subtitle">
-              Create a free Action Maps account so your grids are saved.
-            </p>
-            {authError && <p className="auth-error">{authError}</p>}
-            <form
-              className="auth-form"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setAuthError(null);
-                const formData = new FormData(e.currentTarget);
-                const email = (formData.get("email") as string)?.trim();
-                const password = (formData.get("password") as string)?.trim();
-                const confirm = (formData.get("confirm") as string)?.trim();
-                if (!email || !password || password !== confirm) {
-                  if (password !== confirm) {
-                    setAuthError("Passwords do not match.");
-                  }
-                  return;
-                }
-
-                const { error } = await supabase.auth.signUp({
-                  email,
-                  password,
-                });
-
-                if (error) {
-                  setAuthError(error.message);
-                } else {
-                  // Depending on Supabase settings, user may need email confirmation
-                  setAuthView(null);
-                  // new user -> no projects -> builder + modal
-                }
-              }}
-            >
-              <label className="auth-field">
-                <span>Email</span>
-                <input name="email" type="email" required autoComplete="email" />
-              </label>
-
-              <label className="auth-field">
-                <span>Password</span>
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  autoComplete="new-password"
-                />
-              </label>
-
-              <label className="auth-field">
-                <span>Confirm password</span>
-                <input
-                  name="confirm"
-                  type="password"
-                  required
-                  autoComplete="new-password"
-                />
-              </label>
-
-              <button type="submit" className="auth-submit">
-                Create account
-            </button>
-
-                <button
-                  type="button"
-                className="auth-switch"
-                onClick={() => {
-                  setAuthError(null);
-                  setAuthView("login");
-                }}
-              >
-                Already have an account? Log in
-                </button>
-            </form>
-          </>
-        )}
-      </div>
-    </div>
-  ) : null;
 
   if (appView === "dashboard") {
     return (
-      <div className="app builder-app">
-        <div className="builder-shell">
-          <header className="home-nav">
-            <div className="home-logo">
-              <span className="home-logo-mark">◆</span>
-              <span className="home-logo-text">
-                Action<span>Maps</span>
-              </span>
-            </div>
-
-            <nav className="home-nav-actions">
-              {isLoggedIn && user?.email ? (
-                <>
-                  {isAdmin && <span className="home-nav-user-pill">Admin</span>}
-                  {!isAdmin && (
-                    <span className="home-nav-user-pill">{user.email}</span>
-                  )}
-                <button
-                  type="button"
-                  className="home-nav-link"
-                  onClick={() => supabase.auth.signOut()}
-                >
-                  Log out
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="home-nav-link"
-                    onClick={() => {
-                      setAuthError(null);
-                      setAuthView("login");
-                    }}
-                >
-                  Log in
-                </button>
-                <button
-                  type="button"
-                  className="home-nav-cta"
-                    onClick={() => {
-                      setAuthError(null);
-                      setAuthView("signup");
-                    }}
-                >
-                  Sign up
-                </button>
-              </>
-            )}
-          </nav>
-        </header>
-
-          <main className="dashboard-main">
-            <div className="dashboard-header">
-              <div>
-                <h1 className="dashboard-title">Your Action Maps</h1>
-                <p className="dashboard-subtitle">
-                  Open an existing map or start a new one.
-                </p>
-              </div>
-                <button
-                  type="button"
-                  className="hero-primary-cta"
-                onClick={() => {
-                  // new blank map + onboarding modal again
-                  setState(createEmptyState());
-                  setViewMode("grid");
-                  setStartModalOpen(true);
-                  setAppView("builder");
-                }}
-              >
-                New map
-                </button>
-            </div>
-
-            {projects.length === 0 ? (
-              <p className="dashboard-empty">
-                You don&apos;t have any saved maps yet. Start a new one to see it
-                here next time.
-              </p>
-            ) : (
-              <div className="dashboard-grid">
-                {projects.map((p) => (
-                <button
-                    key={p.id}
-                    className="dashboard-card"
-                  type="button"
-                    onClick={async () => {
-                      // Load this project and jump into builder (View mode)
-                      const { data, error } = await supabase
-                        .from("action_maps")
-                        .select("state")
-                        .eq("id", p.id)
-                        .single();
-
-                      if (!error && data?.state) {
-                        setState(data.state as HaradaState);
-                        setViewMode("grid");
-                        setStartModalOpen(false);
-                        setAppView("builder");
-                      }
-                    }}
-                  >
-                    <h2 className="dashboard-card-title">
-                      {p.title || "Untitled map"}
-                    </h2>
-                    <p className="dashboard-card-meta">
-                      Updated {new Date(p.updated_at).toLocaleDateString()}
-                    </p>
-                </button>
-                ))}
-              </div>
-            )}
-          </main>
-
-          {authOverlay}
-              </div>
-            </div>
+      <DashboardPage
+        projects={projects}
+        user={user}
+        isAdmin={isAdmin}
+        authView={authView}
+        onSetState={setState}
+        onSetViewMode={setViewMode}
+        onSetStartModalOpen={setStartModalOpen}
+        onSetAppView={setAppView}
+        onSetAuthView={setAuthView}
+      />
     );
   }
 
@@ -640,20 +379,14 @@ const App: React.FC = () => {
                 <button
                   type="button"
                   className="home-nav-link"
-                    onClick={() => {
-                      setAuthError(null);
-                      setAuthView("login");
-                    }}
+                  onClick={() => setAuthView("login")}
                 >
                   Log in
                 </button>
                 <button
                   type="button"
                   className="home-nav-cta"
-                    onClick={() => {
-                      setAuthError(null);
-                      setAuthView("signup");
-                    }}
+                  onClick={() => setAuthView("signup")}
                 >
                   Sign up
                 </button>
@@ -728,15 +461,15 @@ const App: React.FC = () => {
               </section>
 
               <div className="info-ctas">
-              <button
-                type="button"
+                <button
+                  type="button"
                   className="hero-primary-cta"
                   onClick={() => setAppView("builder")}
                 >
                   Start your first map
-              </button>
-              <button
-                type="button"
+                </button>
+                <button
+                  type="button"
                   className="hero-secondary-cta hero-outline-cta info-secondary"
                   onClick={() => setAppView("home")}
                 >
@@ -789,23 +522,17 @@ const App: React.FC = () => {
               <>
               <button
                 type="button"
-                  className="home-nav-link"
-                  onClick={() => {
-                    setAuthError(null);
-                    setAuthView("login");
-                  }}
-                >
-                  Log in
+                className="home-nav-link"
+                onClick={() => setAuthView("login")}
+              >
+                Log in
               </button>
               <button
                 type="button"
-                  className="home-nav-cta"
-                  onClick={() => {
-                    setAuthError(null);
-                    setAuthView("signup");
-                  }}
-                >
-                  Sign up
+                className="home-nav-cta"
+                onClick={() => setAuthView("signup")}
+              >
+                Sign up
               </button>
               </>
             )}
@@ -824,10 +551,7 @@ const App: React.FC = () => {
                     <button
                       type="button"
                       className="builder-status-link"
-                      onClick={() => {
-                        setAuthError(null);
-                        setAuthView("signup");
-                      }}
+                      onClick={() => setAuthView("signup")}
                     >
                       Sign up
                     </button>{" "}
@@ -970,7 +694,11 @@ const App: React.FC = () => {
             </div>
       </main>
 
-          {authOverlay}
+          <AuthModal
+            authView={authView}
+            onClose={() => setAuthView(null)}
+            onSwitchView={(view) => setAuthView(view)}
+          />
 
           {startModalOpen && (
             <div className="start-overlay" role="dialog" aria-modal="true">
@@ -1051,23 +779,17 @@ const App: React.FC = () => {
                 <button
                   type="button"
                   className="home-nav-link"
-                  onClick={() => {
-                    setAuthError(null);
-                    setAuthView("login");
-                  }}
+                  onClick={() => setAuthView("login")}
                 >
-                      Log in
-                    </button>
-                    <button
-                      type="button"
+                  Log in
+                </button>
+                <button
+                  type="button"
                   className="home-nav-cta"
-                  onClick={() => {
-                    setAuthError(null);
-                    setAuthView("signup");
-                  }}
+                  onClick={() => setAuthView("signup")}
                 >
                   Sign up
-                    </button>
+                </button>
               </>
             )}
           </nav>
@@ -1280,7 +1002,11 @@ const App: React.FC = () => {
         </section>
       </main>
 
-        {authOverlay}
+        <AuthModal
+          authView={authView}
+          onClose={() => setAuthView(null)}
+          onSwitchView={(view) => setAuthView(view)}
+        />
 
         <footer className="home-footer">
           <p>
