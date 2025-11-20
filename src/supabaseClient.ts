@@ -68,7 +68,7 @@ const createSafeClient = (): SupabaseClient => {
           }),
           upsert: async () => ({ error: null }),
         }),
-      } as SupabaseClient;
+      } as unknown as SupabaseClient;
     }
   }
 };
