@@ -27,6 +27,7 @@ export const HaradaInfoPage: React.FC<HaradaInfoPageProps> = ({
           isAdmin={isAdmin}
           onSetAuthView={onSetAuthView}
           onGoToPricing={() => onSetAppView("pricing")}
+          onGoToDashboard={() => onSetAppView("dashboard")}
         />
 
         <main className="info-main">

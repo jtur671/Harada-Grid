@@ -2,9 +2,9 @@ import React from "react";
 
 type StartModalProps = {
   isOpen: boolean;
-  onClose: () => void;
-  onFillYourself: () => void;
-  onUseAI: () => void;
+  onClose: () => void | Promise<void>;
+  onFillYourself: () => void | Promise<void>;
+  onUseAI: () => void | Promise<void>;
 };
 
 export const StartModal: React.FC<StartModalProps> = ({

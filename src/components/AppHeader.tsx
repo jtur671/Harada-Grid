@@ -11,6 +11,7 @@ type AppHeaderProps = {
   isAdmin: boolean;
   onSetAuthView: (view: AuthView) => void;
   onGoToPricing?: () => void;
+  onGoToDashboard?: () => void;
 };
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -20,6 +21,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   isAdmin,
   onSetAuthView,
   onGoToPricing,
+  onGoToDashboard,
 }) => {
   const isLoggedIn = !!user;
 
@@ -51,6 +53,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             onClick={onGoToPricing}
           >
             Pricing
+          </button>
+        )}
+
+        {/* Dashboard link, only when logged in */}
+        {isLoggedIn && onGoToDashboard && (
+          <button
+            type="button"
+            className="home-nav-link"
+            onClick={onGoToDashboard}
+          >
+            My maps
           </button>
         )}
 

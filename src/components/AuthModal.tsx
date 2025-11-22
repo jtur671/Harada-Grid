@@ -38,8 +38,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const titleId = `auth-title-${authView}`;
+  const errorId = `auth-error-${authView}`;
+
   return (
-    <div className="auth-overlay" role="dialog" aria-modal="true">
+    <div
+      className="auth-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
       <div className="auth-card">
         <button
           type="button"
@@ -52,12 +60,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {authView === "login" ? (
           <>
-            <h2 className="auth-title">Log in</h2>
+            <h2 id={titleId} className="auth-title">
+              Log in
+            </h2>
             <p className="auth-subtitle">
               Log in to access your saved Action Maps.
             </p>
 
-            {authError && <p className="auth-error">{authError}</p>}
+            {authError && (
+              <p id={errorId} className="auth-error" role="alert">
+                {authError}
+              </p>
+            )}
 
             {/* Google sign-in */}
             <button
@@ -97,18 +111,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }
               }}
             >
-              <label className="auth-field">
+              <label htmlFor="login-email" className="auth-field">
                 <span>Email</span>
-                <input name="email" type="email" required autoComplete="email" />
+                <input
+                  id="login-email"
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  aria-describedby={authError ? errorId : undefined}
+                />
               </label>
 
-              <label className="auth-field">
+              <label htmlFor="login-password" className="auth-field">
                 <span>Password</span>
                 <input
+                  id="login-password"
                   name="password"
                   type="password"
                   required
                   autoComplete="current-password"
+                  aria-describedby={authError ? errorId : undefined}
                 />
               </label>
 
@@ -130,12 +153,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </>
         ) : (
           <>
-            <h2 className="auth-title">Create your account</h2>
+            <h2 id={titleId} className="auth-title">
+              Create your account
+            </h2>
             <p className="auth-subtitle">
               Save your Action Maps and sync across devices.
             </p>
 
-            {authError && <p className="auth-error">{authError}</p>}
+            {authError && (
+              <p id={errorId} className="auth-error" role="alert">
+                {authError}
+              </p>
+            )}
 
             {/* Google sign-up (same OAuth flow) */}
             <button
@@ -183,28 +212,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }
               }}
             >
-              <label className="auth-field">
+              <label htmlFor="signup-email" className="auth-field">
                 <span>Email</span>
-                <input name="email" type="email" required autoComplete="email" />
+                <input
+                  id="signup-email"
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  aria-describedby={authError ? errorId : undefined}
+                />
               </label>
 
-              <label className="auth-field">
+              <label htmlFor="signup-password" className="auth-field">
                 <span>Password</span>
                 <input
+                  id="signup-password"
                   name="password"
                   type="password"
                   required
                   autoComplete="new-password"
+                  aria-describedby={authError ? errorId : undefined}
                 />
               </label>
 
-              <label className="auth-field">
+              <label htmlFor="signup-confirm" className="auth-field">
                 <span>Confirm password</span>
                 <input
+                  id="signup-confirm"
                   name="confirm"
                   type="password"
                   required
                   autoComplete="new-password"
+                  aria-describedby={authError ? errorId : undefined}
                 />
               </label>
 

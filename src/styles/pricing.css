@@ -1,0 +1,255 @@
+/* ---------- Pricing page ---------- */
+
+.pricing-main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+}
+
+.pricing-hero {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.pricing-eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: #f97316;
+  margin-bottom: 8px;
+}
+
+.pricing-title {
+  font-size: 32px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #f9fafb;
+  margin-bottom: 8px;
+}
+
+.pricing-subtitle {
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+
+@media (max-width: 800px) {
+  .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pricing-card {
+  border-radius: 24px;
+  padding: 24px 22px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.8);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pricing-card-premium {
+  border-color: #fb923c;
+  box-shadow: 0 22px 50px rgba(248, 113, 113, 0.25);
+}
+
+.pricing-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pricing-card-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #f9fafb;
+}
+
+.pricing-badge {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+.pricing-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.pricing-amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: #f9fafb;
+}
+
+.pricing-period {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.pricing-tagline {
+  font-size: 13px;
+  color: #e5e7eb;
+}
+
+.pricing-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #d1d5db;
+}
+
+.pricing-cta-btn {
+  margin-top: 8px;
+  border-radius: 999px;
+  border: none;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background: #0f172a;
+  color: #f9fafb;
+}
+
+.pricing-cta-btn:hover {
+  background: #020617;
+}
+
+.pricing-cta-btn-premium {
+  background: linear-gradient(135deg, #fb923c, #f97316);
+  color: #0f172a;
+}
+
+.pricing-cta-btn-premium:hover {
+  filter: brightness(1.05);
+}
+
+.pricing-footnote {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* ---------- Pricing FAQ ---------- */
+
+.pricing-faq {
+  margin-top: 48px;
+}
+
+.pricing-faq-title {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #f9fafb;
+  margin-bottom: 24px;
+}
+
+.pricing-faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 32px;
+}
+
+@media (max-width: 800px) {
+  .pricing-faq-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pricing-faq-card {
+  border-radius: 18px;
+  padding: 16px 18px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.8);
+}
+
+.pricing-faq-card h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin-bottom: 6px;
+}
+
+.pricing-faq-card p {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.pricing-footer {
+  text-align: center;
+  color: #e5e7eb;
+}
+
+.pricing-footer h2 {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.pricing-footer p {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* ---------- Pricing Page Footer ---------- */
+footer.pricing-footer {
+  margin-top: 3rem;
+  padding: 2rem 1.5rem;
+  border-top: 1px solid #252538;
+  font-size: 0.85rem;
+  color: #b6b6d1;
+  text-align: center;
+}
+
+.pricing-footer a {
+  color: #f5c64d;
+  text-decoration: none;
+}
+
+.pricing-footer a:hover {
+  text-decoration: underline;
+}
+
+.pricing-footer__disclaimer {
+  margin-bottom: 0.75rem;
+}
+
+.pricing-footer__support,
+.pricing-footer__coffee,
+.pricing-footer__links {
+  margin-top: 0.35rem;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+  color: #b6b6d1;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.pricing-footer .dot {
+  margin: 0 0.4rem;
+  opacity: 0.7;
+}

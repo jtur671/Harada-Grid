@@ -1,6 +1,8 @@
 /* Dashboard styles */
 .dashboard-main {
-  padding: 28px 0 40px;
+  padding: 32px 0 48px;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .dashboard-header {
@@ -8,58 +10,269 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-end;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding: 0 24px;
+}
+
+.dashboard-header .hero-primary-cta {
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-header .hero-primary-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
 }
 
 .dashboard-title {
   margin: 0;
-  font-size: 24px;
+  font-size: 32px;
+  font-weight: 700;
   color: #111827;
+  letter-spacing: -0.02em;
 }
 
 .dashboard-subtitle {
-  margin: 4px 0 0;
-  font-size: 14px;
+  margin: 8px 0 0;
+  font-size: 15px;
   color: #6b7280;
+  font-weight: 400;
 }
 
 .dashboard-empty {
-  font-size: 14px;
+  font-size: 15px;
   color: #6b7280;
+  padding: 0 24px;
+  text-align: center;
+  padding-top: 60px;
 }
 
 .dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 24px;
 }
 
 .dashboard-card {
-  text-align: left;
-  border-radius: 16px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  padding: 14px 14px 12px;
-  cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.1s ease, border-color 0.1s;
+  position: relative;
+  border-radius: 20px;
+  border: 1px solid #ffffff;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.dashboard-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .dashboard-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(148, 163, 184, 0.3);
-  border-color: #a5b4fc;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.15);
+  border-color: #e5e7eb;
+}
+
+.dashboard-card:hover::before {
+  opacity: 1;
+}
+
+.dashboard-card-content {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 20px 28px;
+  padding-right: 80px; /* Space for delete button (28px + 16px margin + 36px buffer) */
+  cursor: pointer;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.dashboard-card-delete {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 1;
+  opacity: 0.7;
+}
+
+.dashboard-card:hover .dashboard-card-delete {
+  opacity: 1;
+}
+
+.dashboard-card-delete:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #b91c1c;
+  transform: scale(1.1);
 }
 
 .dashboard-card-title {
-  margin: 0 0 4px;
-  font-size: 16px;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
   color: #111827;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  line-height: 1.4;
+  padding-left: 4px; /* Add left padding for better spacing */
+  padding-right: 12px; /* Extra space to prevent cutoff */
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  max-width: 100%;
+}
+
+.dashboard-card-title:hover {
+  color: #6366f1;
+}
+
+.dashboard-card-title-input {
+  width: 100%;
+  max-width: calc(100% - 8px); /* Prevent overflow */
+  font-size: 20px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 2px solid #d1d5db;
+  outline: none;
+  margin: 0;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.dashboard-card-title-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.dashboard-card-goal {
+  margin: 0;
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.6;
+  font-weight: 400;
+  padding-left: 20px;
+  padding-right: 12px; /* Prevent overlap with delete button */
+  position: relative;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  max-width: 100%;
+  /* Allow up to 3 lines, then truncate */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 22px; /* Single line minimum */
+}
+
+.dashboard-card-goal::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  color: #a855f7;
+  font-weight: 600;
+  opacity: 0.5;
+  transition: all 0.2s ease;
+  line-height: 1.5;
+}
+
+.dashboard-card:hover .dashboard-card-goal::before {
+  opacity: 1;
+  transform: translateX(2px);
 }
 
 .dashboard-card-meta {
-  margin: 0;
-  font-size: 12px;
-  color: #6b7280;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 4px; /* Align with title */
+  padding-right: 4px; /* Extra space for clock icon */
+}
+
+.dashboard-card-meta::before {
+  content: "🕒";
+  font-size: 13px;
+  opacity: 0.7;
+  line-height: 1;
+  flex-shrink: 0; /* Prevent icon from shrinking */
+}
+
+@media (max-width: 768px) {
+  .dashboard-main {
+    padding: 24px 0 32px;
+  }
+
+  .dashboard-header {
+    padding: 0 16px;
+    margin-bottom: 24px;
+  }
+
+  .dashboard-title {
+    font-size: 28px;
+  }
+
+  .dashboard-grid {
+    padding: 0 16px;
+    gap: 12px;
+  }
+
+  .dashboard-card-content {
+    padding: 16px 24px;
+    padding-right: 72px; /* Adjusted for mobile - ensure delete button doesn't overlap */
+  }
+  
+  .dashboard-card-title {
+    padding-right: 8px;
+  }
+  
+  .dashboard-card-goal {
+    padding-right: 8px;
+    -webkit-line-clamp: 2; /* Fewer lines on mobile */
+    line-clamp: 2;
+  }
+
+  .dashboard-card-title {
+    font-size: 18px;
+  }
+
+  .dashboard-card-goal {
+    font-size: 13px;
+    min-height: 38px;
+  }
 }
 

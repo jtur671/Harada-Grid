@@ -1,0 +1,156 @@
+.mini-dashboard {
+  position: sticky;
+  top: calc(var(--nav-offset) + 12px);
+  align-self: flex-start;
+  width: 260px;
+  max-height: calc(100vh - var(--nav-offset) - 24px);
+  background: transparent;
+  color: #111827;
+  padding: 10px 10px 12px;
+  overflow: hidden;
+  z-index: 10;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.mini-dashboard-open {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.mini-dashboard-collapsed {
+  transform: translateX(-70%);
+  opacity: 0.75;
+}
+
+.mini-dashboard-toggle {
+  position: absolute;
+  right: -14px;
+  top: 18px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  z-index: 11;
+}
+
+.mini-dashboard-toggle:hover {
+  background: #f3f4f6;
+}
+
+.mini-dashboard-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mini-dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mini-dashboard-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.mini-dashboard-count {
+  font-size: 13px;
+  color: #111827;
+}
+
+.mini-dashboard-new {
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #ffffff;
+  color: #111827;
+  transition: background 0.2s ease;
+}
+
+.mini-dashboard-new:hover {
+  background: #f3f4f6;
+}
+
+.mini-dashboard-list {
+  margin-top: 4px;
+  padding-right: 4px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mini-dashboard-empty {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 4px 0 0;
+}
+
+.mini-dashboard-item {
+  width: 100%;
+  text-align: left;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 6px 8px;
+  background: #ffffff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: all 0.2s ease;
+}
+
+.mini-dashboard-item:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.mini-dashboard-item-active {
+  border-color: #6366f1;
+  background: #f3f4f6;
+}
+
+.mini-dashboard-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.mini-dashboard-item-goal {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-dashboard-item-meta {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+/* Hide on smaller screens so the map doesn't get cramped */
+@media (max-width: 900px) {
+  .mini-dashboard {
+    display: none;
+  }
+}
+

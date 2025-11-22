@@ -9,6 +9,7 @@ import { AppHeader } from "./AppHeader";
 type ProjectSummary = {
   id: string;
   title: string | null;
+  goal: string | null;
   updated_at: string;
 };
 
@@ -24,6 +25,9 @@ type DashboardPageProps = {
   onSetStartModalOpen: (open: boolean) => void;
   onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing") => void;
   onSetAuthView: (view: AuthView) => void;
+  onSetCurrentProjectId: (id: string | null) => void;
+  onDeleteProject: (projectId: string) => void;
+  onProjectTitleUpdated: (id: string, newTitle: string) => void;
 };
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
@@ -36,7 +40,43 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onSetStartModalOpen,
   onSetAppView,
   onSetAuthView,
+  onSetCurrentProjectId,
+  onDeleteProject,
+  onProjectTitleUpdated,
 }) => {
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = React.useState("");
+
+  const startEditing = (project: ProjectSummary) => {
+    setEditingId(project.id);
+    setDraftTitle(project.title || "Action Map");
+  };
+
+  const commitRename = async (project: ProjectSummary) => {
+    const trimmed = draftTitle.trim();
+    if (!trimmed || trimmed === project.title) {
+      setEditingId(null);
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    const { error } = await supabase
+      .from("action_maps")
+      .update({
+        title: trimmed,
+        updated_at: now,
+      })
+      .eq("id", project.id);
+
+    if (error) {
+      console.error("Failed to rename project", error);
+    } else {
+      onProjectTitleUpdated(project.id, trimmed);
+      setEditingId(null);
+    }
+  };
+
   return (
     <div className="app builder-app">
       <div className="builder-shell">
@@ -45,6 +85,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           isAdmin={isAdmin}
           onSetAuthView={onSetAuthView}
           onGoToPricing={() => onSetAppView("pricing")}
+          onGoToDashboard={() => onSetAppView("dashboard")}
         />
 
         <main className="dashboard-main">
@@ -63,6 +104,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 onSetState(createEmptyState());
                 onSetViewMode("grid");
                 onSetStartModalOpen(true);
+                onSetCurrentProjectId(null); // We're starting a fresh project
                 onSetAppView("builder");
               }}
             >
@@ -78,11 +120,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           ) : (
             <div className="dashboard-grid">
               {projects.map((p) => (
-                <button
+                <div
                   key={p.id}
                   className="dashboard-card"
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={async () => {
+                    if (editingId === p.id) return; // Don't open if editing
                     // Load this project and jump into builder (View mode)
                     const { data, error } = await supabase
                       .from("action_maps")
@@ -94,17 +138,73 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       onSetState(data.state as HaradaState);
                       onSetViewMode("grid");
                       onSetStartModalOpen(false);
+                      onSetCurrentProjectId(p.id);
                       onSetAppView("builder");
                     }
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.currentTarget.click();
+                    }
+                  }}
                 >
-                  <h2 className="dashboard-card-title">
-                    {p.title || "Untitled map"}
-                  </h2>
+                  {/* TITLE / RENAME */}
+                  {editingId === p.id ? (
+                    <input
+                      className="dashboard-card-title-input"
+                      value={draftTitle}
+                      onChange={(e) => setDraftTitle(e.target.value)}
+                      onBlur={() => commitRename(p)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          commitRename(p);
+                        } else if (e.key === "Escape") {
+                          setEditingId(null);
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                    />
+                  ) : (
+                    <h2
+                      className="dashboard-card-title"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditing(p);
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        startEditing(p);
+                      }}
+                    >
+                      {p.title || "Action Map"}
+                    </h2>
+                  )}
+
+                  {/* SUBHEADER = MAIN GOAL */}
+                  <p className="dashboard-card-goal">
+                    {p.goal || "No main goal yet"}
+                  </p>
+
                   <p className="dashboard-card-meta">
                     Updated {new Date(p.updated_at).toLocaleDateString()}
                   </p>
-                </button>
+
+                  <button
+                    type="button"
+                    className="dashboard-card-delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm("Are you sure you want to delete this map?")) {
+                        onDeleteProject(p.id);
+                      }
+                    }}
+                    aria-label="Delete map"
+                  >
+                    ×
+                  </button>
+                </div>
               ))}
             </div>
           )}

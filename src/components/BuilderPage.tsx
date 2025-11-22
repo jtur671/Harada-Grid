@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { HaradaState } from "../types";
 import type { Template } from "../templates";
@@ -10,13 +10,17 @@ import { ResetModal } from "./ResetModal";
 import { AuthModal } from "./AuthModal";
 import { StartModal } from "./StartModal";
 import { AppHeader } from "./AppHeader";
+import { MiniDashboard } from "./MiniDashboard";
 import { triggerPrintWithBodyClass } from "../utils/print";
+import { supabase } from "../supabaseClient";
 
 type AuthView = "login" | "signup" | null;
 type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing";
 
 type BuilderPageProps = {
   state: HaradaState;
+  mapTitle: string;
+  setMapTitle: (title: string) => void;
   viewMode: "map" | "grid";
   setViewMode: (mode: "map" | "grid") => void;
   selectedDate: string;
@@ -42,6 +46,7 @@ type BuilderPageProps = {
   setResetOpen: (open: boolean) => void;
   startModalOpen: boolean;
   setStartModalOpen: (open: boolean) => void;
+  onDismissStartModalPermanently?: () => void;
   authView: AuthView;
   setAuthView: (view: AuthView) => void;
   user: User | null;
@@ -66,11 +71,26 @@ type BuilderPageProps = {
   onAiGenerate: () => void;
   onConfirmReset: () => void;
   onSetAppView: (view: AppView) => void;
+  onEnsureProject: () => void;
   templates: Template[];
+  currentProjectTitle?: string;
+  currentProjectId?: string | null;
+  onProjectTitleUpdated?: (id: string, newTitle: string) => void;
+  // Mini dashboard props
+  projects: {
+    id: string;
+    title: string | null;
+    goal?: string | null;
+    updated_at?: string;
+  }[];
+  onOpenProjectFromSidebar: (id: string) => void;
+  onNewMapFromSidebar?: () => void;
 };
 
 export const BuilderPage: React.FC<BuilderPageProps> = ({
   state,
+  mapTitle,
+  setMapTitle,
   viewMode,
   setViewMode,
   selectedDate,
@@ -92,6 +112,7 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
   setResetOpen,
   startModalOpen,
   setStartModalOpen,
+  onDismissStartModalPermanently,
   authView,
   setAuthView,
   user,
@@ -116,8 +137,68 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
   onAiGenerate,
   onConfirmReset,
   onSetAppView,
+  onEnsureProject,
   templates,
+  currentProjectTitle = "Action Map",
+  currentProjectId,
+  onProjectTitleUpdated,
+  projects,
+  onOpenProjectFromSidebar,
+  onNewMapFromSidebar,
 }) => {
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [tempTitle, setTempTitle] = useState(currentProjectTitle);
+
+  // Sync tempTitle when currentProjectTitle changes (e.g., renamed from dashboard)
+  useEffect(() => {
+    if (!isEditingTitle) {
+      setTempTitle(currentProjectTitle);
+    }
+  }, [currentProjectTitle, isEditingTitle]);
+
+  const handleStartEditTitle = () => {
+    setTempTitle(currentProjectTitle);
+    setIsEditingTitle(true);
+  };
+
+  const handleSaveTitle = async () => {
+    const trimmed = tempTitle.trim();
+    const finalTitle = trimmed || "Your Action Map";
+    
+    // Update local state
+    setMapTitle(finalTitle);
+    setIsEditingTitle(false);
+
+    // Save to database if we have a project ID
+    if (currentProjectId && user && onProjectTitleUpdated) {
+      try {
+        const now = new Date().toISOString();
+        const { error } = await supabase
+          .from("action_maps")
+          .update({
+            title: finalTitle,
+            updated_at: now,
+          })
+          .eq("id", currentProjectId)
+          .eq("user_id", user.id);
+
+        if (error) {
+          console.error("Error updating project title:", error);
+        } else {
+          // Update the projects list in App.tsx
+          onProjectTitleUpdated(currentProjectId, finalTitle);
+        }
+      } catch (e) {
+        console.error("Error updating project title:", e);
+      }
+    }
+  };
+
+  const handleCancelEditTitle = () => {
+    setTempTitle(mapTitle);
+    setIsEditingTitle(false);
+  };
+
   const handleExport = () => {
     // We only show the button in View mode, but keep this guard just in case
     if (viewMode !== "grid") {
@@ -155,11 +236,52 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
           isAdmin={isAdmin}
           onSetAuthView={setAuthView}
           onGoToPricing={() => onSetAppView("pricing")}
+          onGoToDashboard={() => onSetAppView("dashboard")}
         />
 
         <main className="builder-main">
-          <div className="builder-top-row">
-            <h1 className="builder-title">Your Action Map</h1>
+          <div className="builder-layout">
+            <MiniDashboard
+              projects={projects}
+              currentProjectId={currentProjectId || null}
+              onSelectProject={onOpenProjectFromSidebar}
+              onNewMap={onNewMapFromSidebar}
+            />
+
+            <div className="builder-content">
+              <div className="builder-top-row">
+            <div className="builder-title-wrapper">
+              {isEditingTitle ? (
+                <input
+                  type="text"
+                  className="builder-title builder-title-editable"
+                  value={tempTitle}
+                  onChange={(e) => setTempTitle(e.target.value)}
+                  onBlur={handleSaveTitle}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSaveTitle();
+                    } else if (e.key === "Escape") {
+                      handleCancelEditTitle();
+                    }
+                  }}
+                  autoFocus
+                  placeholder="Your Action Map"
+                />
+              ) : (
+                <>
+                  <h1 className="builder-title">{currentProjectTitle}</h1>
+                  <button
+                    type="button"
+                    className="builder-title-edit-btn"
+                    onClick={handleStartEditTitle}
+                    aria-label="Edit map title"
+                  >
+                    ✎
+                  </button>
+                </>
+              )}
+            </div>
             <div className="builder-status">
               {isLoggedIn ? (
                 <span>Changes will be saved to your account automatically.</span>
@@ -171,7 +293,7 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
                     className="builder-status-link"
                     onClick={() => setAuthView("signup")}
                   >
-                    Sign up
+                    Sign up for free
                   </button>{" "}
                   to save this map.
                 </span>
@@ -189,21 +311,21 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
                       type="button"
                       className={
                         "view-toggle-btn" +
-                        (viewMode === "map" ? " view-toggle-btn-active" : "")
-                      }
-                      onClick={() => setViewMode("map")}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className={
-                        "view-toggle-btn" +
                         (viewMode === "grid" ? " view-toggle-btn-active" : "")
                       }
                       onClick={() => setViewMode("grid")}
                     >
                       View
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        "view-toggle-btn" +
+                        (viewMode === "map" ? " view-toggle-btn-active" : "")
+                      }
+                      onClick={() => setViewMode("map")}
+                    >
+                      Edit
                     </button>
                   </div>
 
@@ -308,6 +430,8 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
               )}
             </section>
           </div>
+            </div>
+          </div>
         </main>
 
         <AuthModal
@@ -318,13 +442,31 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
 
         <StartModal
           isOpen={startModalOpen}
-          onClose={() => setStartModalOpen(false)}
-          onFillYourself={() => {
-            setViewMode("map"); // jump to Edit mode
-            setStartModalOpen(false);
+          onClose={async () => {
+            // "Skip for now" – still create a project row
+            await onEnsureProject();
+            if (onDismissStartModalPermanently) {
+              onDismissStartModalPermanently();
+            } else {
+              setStartModalOpen(false);
+            }
           }}
-          onUseAI={() => {
-            setStartModalOpen(false);
+          onFillYourself={async () => {
+            await onEnsureProject();
+            setViewMode("map"); // jump to Edit mode
+            if (onDismissStartModalPermanently) {
+              onDismissStartModalPermanently();
+            } else {
+              setStartModalOpen(false);
+            }
+          }}
+          onUseAI={async () => {
+            await onEnsureProject();
+            if (onDismissStartModalPermanently) {
+              onDismissStartModalPermanently();
+            } else {
+              setStartModalOpen(false);
+            }
             setViewMode("map"); // edit mode so they can tweak
             setAiModalOpen(true); // open your existing AI helper modal
           }}

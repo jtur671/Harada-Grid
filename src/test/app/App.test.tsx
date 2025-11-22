@@ -1,17 +1,19 @@
+import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi } from "vitest";
-import App from "./App";
+import { describe, it, expect, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+import App from "../../App";
 
-vi.mock("./components/EditMode", () => ({
-  EditMode: () => <div data-testid="edit-mode">Edit Mode</div>,
+vi.mock("../../components/EditMode", () => ({
+  EditMode: () => React.createElement("div", { "data-testid": "edit-mode" }, "Edit Mode"),
 }));
 
-vi.mock("./components/ViewMode", () => ({
-  ViewMode: () => <div data-testid="view-mode">View Mode</div>,
+vi.mock("../../components/ViewMode", () => ({
+  ViewMode: () => React.createElement("div", { "data-testid": "view-mode" }, "View Mode"),
 }));
 
-vi.mock("./supabaseClient", () => {
+vi.mock("../../supabaseClient", () => {
   const subscription = { unsubscribe: vi.fn() };
 
   return {
@@ -49,13 +51,16 @@ describe("App view toggles", () => {
     const cta = await screen.findByRole("button", { name: /get started free/i });
     await user.click(cta);
 
-    expect(await screen.findByTestId("edit-mode")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "View" }));
+    // App defaults to View mode (grid)
     expect(await screen.findByTestId("view-mode")).toBeInTheDocument();
 
+    // Switch to Edit mode
     await user.click(screen.getByRole("button", { name: "Edit" }));
     expect(await screen.findByTestId("edit-mode")).toBeInTheDocument();
+
+    // Switch back to View mode
+    await user.click(screen.getByRole("button", { name: "View" }));
+    expect(await screen.findByTestId("view-mode")).toBeInTheDocument();
   });
 });
 

@@ -38,6 +38,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           isAdmin={isAdmin}
           onSetAuthView={onSetAuthView}
           onGoToPricing={() => onSetAppView("pricing")}
+          onGoToDashboard={() => onSetAppView("dashboard")}
         />
 
         <main className="home-main">

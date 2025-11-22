@@ -1,0 +1,911 @@
+/* ---------- Panel + layout ---------- */
+
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.builder-app {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.builder-shell {
+  min-height: 100vh;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 16px 40px;
+  display: flex;
+  flex-direction: column;
+}
+
+.builder-app .home-nav {
+  position: static;
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+  backdrop-filter: none;
+}
+
+.builder-app .home-nav-link {
+  color: #4b5563;
+}
+
+.builder-app .home-logo-text span:first-child {
+  color: #4b5563;
+}
+
+.builder-main {
+  padding: 24px 0 0;
+}
+
+.builder-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.builder-content {
+  min-width: 0;
+}
+
+/* On small screens collapse back to single column */
+@media (max-width: 900px) {
+  .builder-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.builder-top-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.builder-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.builder-title {
+  font-size: 22px;
+  margin: 0;
+  color: #111827;
+}
+
+.builder-title-edit-btn {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  font-size: 14px;
+  color: #6b7280;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+.builder-title-edit-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #111827;
+  opacity: 1;
+}
+
+.builder-title-editable {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid #f97316;
+  padding: 0;
+  font-size: 22px;
+  font-weight: inherit;
+  color: #111827;
+  width: 100%;
+  max-width: 400px;
+  cursor: text;
+  transition: border-color 0.2s;
+}
+
+.builder-title-editable:focus {
+  outline: none;
+  border-bottom-color: #f97316;
+}
+
+.builder-title-editable::placeholder {
+  color: #9ca3af;
+}
+
+.builder-status {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.builder-status-link {
+  border: none;
+  background: transparent;
+  color: #4f46e5;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.builder-main .panel {
+  background: #ffffff;
+}
+
+.builder-app .panel-subtitle {
+  color: #6b7280;
+}
+
+/* Dashboard and Info styles are now in separate files */
+
+.panel {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 20px 20px 24px;
+  /* important: allow grid to extend and scroll */
+  overflow: visible;
+}
+
+.panel-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.panel-header-row h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-subtitle {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.panel-subtitle.small {
+  font-size: 12px;
+}
+
+/* ---------- Buttons ---------- */
+
+.view-toggle {
+  background: #f3f4f6;
+  border-radius: 999px;
+  padding: 3px;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.view-toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #4b5563;
+}
+
+.view-toggle-btn-active {
+  background: #111827;
+  color: #f9fafb;
+}
+
+.export-btn,
+.template-btn,
+.modal-close-btn,
+.date-nav-btn,
+.date-today-btn,
+.diary-history-page-btn,
+.reset-btn {
+  border-radius: 999px;
+  border: 1px solid #111827;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  color: #111827;
+}
+
+.export-btn:hover,
+.template-btn:hover,
+.modal-close-btn:hover,
+.date-nav-btn:hover,
+.date-today-btn:hover,
+.diary-history-page-btn:hover,
+.reset-btn:hover {
+  background: #111827;
+  color: #f9fafb;
+}
+
+/* reset-confirm button in warning modal */
+.reset-confirm-btn {
+  border-radius: 999px;
+  border: 1px solid #b91c1c;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: #ef4444;
+  color: #fef2f2;
+  cursor: pointer;
+}
+
+.reset-confirm-btn:hover {
+  background: #b91c1c;
+}
+
+/* AI Templates button – brighter to draw attention */
+.ai-template-btn {
+  border-radius: 999px;
+  border: none;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #2563eb, #f97316);
+  color: #f9fafb;
+  font-weight: 500;
+}
+
+.ai-template-btn:hover {
+  filter: brightness(1.05);
+}
+
+/* AI goal input inside modal */
+.ai-goal-input {
+  width: 100%;
+  min-height: 90px;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  padding: 10px 12px;
+  font-size: 13px;
+  resize: vertical;
+  margin: 6px 0 10px;
+}
+
+.ai-goal-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
+}
+
+/* Generate with AI button */
+.ai-generate-btn {
+  border-radius: 999px;
+  border: none;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #2563eb;
+  color: #f9fafb;
+  font-weight: 500;
+}
+
+.ai-generate-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ai-generate-btn:not(:disabled):hover {
+  background: #1d4ed8;
+}
+
+/* ---------- Goal + Map view ---------- */
+
+.goal-map {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  margin-top: 8px;
+}
+
+.goal-center-card {
+  border-radius: 24px;
+  padding: 18px 24px;
+  border: 2px solid #fbbf24;
+  background: #fffbeb;
+  max-width: 520px;
+  width: 100%;
+}
+
+.goal-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #b45309;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.goal-input {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid #fcd34d;
+  padding: 10px 12px;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 60px;
+  background: #fffbeb;
+}
+
+.goal-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px #f59e0b;
+}
+
+/* Pillar cards */
+
+.pillar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 720px;
+}
+
+.pillar-card {
+  border: none;
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: #020617;
+  color: #f9fafb;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pillar-card-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #020617;
+  color: #f9fafb;
+  font-size: 13px;
+  margin-right: 10px;
+}
+
+.pillar-card-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.pillar-card-active {
+  background: #f59e0b;
+  color: #111827;
+}
+
+/* Pillar detail section */
+
+.pillar-detail {
+  margin-top: 20px;
+  border-radius: 18px;
+  background: #f9fafb;
+  padding: 14px 14px 16px;
+}
+
+.pillar-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.pillar-detail-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #9ca3af;
+}
+
+.pillar-detail-meta {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-left: auto;
+}
+
+.pillar-name-input {
+  flex: 1;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.pillar-name-input:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.4);
+}
+
+.tasks-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.task-card {
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 8px 9px;
+  border: 1px solid #e5e7eb;
+}
+
+.task-number {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.task-input {
+  margin-top: 4px;
+  width: 100%;
+  border: none;
+  resize: vertical;
+  min-height: 42px;
+  font-size: 13px;
+}
+
+.task-input:focus {
+  outline: none;
+}
+
+/* ---------- Traditional grid view ---------- */
+
+.traditional-wrapper {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  /* key: let the grid scroll horizontally if needed */
+  overflow-x: auto;
+}
+
+.traditional-title {
+  text-align: center;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #9ca3af;
+  margin-bottom: 8px;
+}
+
+/* The grid itself has a min-width so cells don’t get absurdly skinny */
+.traditional-grid {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(90px, 1fr));
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #fefce8;
+  min-width: 900px; /* ensures full 9 columns; scrolls if panel is narrower */
+}
+
+.traditional-cell {
+  border-right: 1px solid #f3f4f6;
+  border-bottom: 1px solid #f3f4f6;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  word-wrap: break-word;
+}
+
+.traditional-cell:nth-child(9n) {
+  border-right: none;
+}
+
+.traditional-grid > :nth-last-child(-n + 9) {
+  border-bottom: none;
+}
+
+.traditional-goal-cell {
+  background: #fef3c7;
+  color: #111827;
+  font-weight: 600;
+}
+
+.traditional-pillar-cell {
+  background: #020617;
+  color: #f9fafb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.traditional-task-cell {
+  background: #fefce8;
+  color: #374151;
+  cursor: pointer; /* clickable for mark done */
+}
+
+.traditional-task-done {
+  background: #bbf7d0;
+  color: #064e3b;
+}
+
+.traditional-empty-cell {
+  background: #fefce8;
+}
+
+.placeholder {
+  color: #d1d5db;
+}
+
+/* ---------- Progress bar + updated diary (View mode) ---------- */
+
+.progress-bar-section {
+  margin-top: 8px;
+  margin-bottom: 16px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: #f9f5eb;
+}
+
+.progress-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.progress-bar-title {
+  font-weight: 600;
+  color: #111827;
+}
+
+.progress-bar-count {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.progress-bar-track {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #e5dfcf;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: #111827;
+  transition: width 0.2s ease;
+}
+
+.progress-pillars-row {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.progress-pillar-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+.progress-pillar-dot-complete {
+  background: #111827;
+  border-color: #111827;
+  color: #ffffff;
+}
+
+/* ---------- Daily Diary (View mode) ---------- */
+
+.view-diary {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.date-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.date-row-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.date-static {
+  color: #111827;
+}
+
+.date-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-nav input[type="date"] {
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.diary-input {
+  width: 100%;
+  min-height: 120px;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  padding: 10px 12px;
+  font-size: 13px;
+  resize: vertical;
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+.diary-input:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.4);
+}
+
+/* Diary history */
+
+.diary-history {
+  margin-top: 8px;
+}
+
+.diary-history-header {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  background: #f3f4f6;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.diary-history-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.diary-history-chevron {
+  font-size: 10px;
+}
+
+.diary-history-body {
+  margin-top: 8px;
+  border-radius: 14px;
+  background: #f9fafb;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+}
+
+.diary-history-empty {
+  margin: 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.diary-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.diary-history-list.nested {
+  margin-top: 8px;
+  padding-left: 12px;
+}
+
+.diary-history-entry {
+  margin-bottom: 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.diary-history-entry:last-child {
+  border-bottom: none;
+}
+
+.diary-history-entry-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.diary-history-entry-header.older-header {
+  background: #f3f4f6;
+}
+
+.diary-history-entry-date {
+  font-size: 12px;
+  font-weight: 500;
+  margin-right: 8px;
+  color: #374151;
+}
+
+.diary-history-entry-summary {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.diary-history-entry-body {
+  padding: 6px 10px 8px;
+}
+
+.diary-history-entry-text {
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.diary-history-entry-actions {
+  font-size: 11px;
+  color: #16a34a;
+  margin-top: 2px;
+}
+
+.diary-history-older {
+  margin-top: 6px;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 768px) {
+  .pillar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tasks-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app {
+    padding: 0 10px 32px;
+  }
+}
+
+/* ---------- Print layout: page 1 = diary, page 2 = grid ---------- */
+
+@page {
+  size: landscape;
+  margin: 10mm;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .app {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .panel {
+    box-shadow: none;
+    border-radius: 0;
+    padding: 12px 16px;
+  }
+
+  /* Hide interactive + goal UI from print.
+     We want only Daily Diary + History + Grid. */
+  .panel-header-row,
+  .panel-subtitle,
+  .progress-bar-section,
+  .view-toggle,
+  .template-btn,
+  .ai-template-btn,
+  .reset-btn,
+  .export-btn {
+    display: none !important;
+  }
+
+  /* Keep main app header but tighten spacing a bit */
+  .app-header {
+    margin-bottom: 8px;
+  }
+
+  /* PAGE 1: Daily Diary + History
+     Force a page break AFTER the diary section so the grid is always
+     on its own page, even if the diary is short. */
+  .view-diary {
+    break-after: page;
+    page-break-after: always;
+    margin-bottom: 12px;
+  }
+
+  /* Make sure diary history content is visible in print.
+     (JS already expands it with .print-mode, this is a safety net.) */
+  .print-mode .diary-history-body {
+    display: block !important;
+  }
+
+  .print-mode .diary-history-list,
+  .print-mode .diary-history-list.nested {
+    display: block !important;
+  }
+
+  /* PAGE 2: Grid only */
+  .traditional-wrapper {
+    overflow: visible !important;
+    margin-top: 8px;
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .traditional-grid {
+    min-width: 0; /* let it shrink to fit page width */
+    grid-template-columns: repeat(9, 1fr); /* equal columns */
+  }
+
+  .traditional-cell {
+    font-size: 10px;
+    padding: 4px 6px;
+  }
+
+  /* Ensure completed tasks are clearly visible in print */
+  .traditional-task-done {
+    background: #bbf7d0 !important;
+    color: #064e3b !important;
+    position: relative;
+    font-weight: 600;
+  }
+
+  /* Add a checkmark so it's obvious even if the color prints faint */
+  .traditional-task-done::before {
+    content: "✓ ";
+    font-weight: 700;
+  }
+}
+
