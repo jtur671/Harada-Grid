@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import type { HaradaState } from "../types";
 import { createEmptyState } from "../utils/harada";
 import { AuthModal } from "./AuthModal";
+import { AppHeader } from "./AppHeader";
 
 type ProjectSummary = {
   id: string;
@@ -21,7 +22,7 @@ type DashboardPageProps = {
   onSetState: (state: HaradaState) => void;
   onSetViewMode: (mode: "map" | "grid") => void;
   onSetStartModalOpen: (open: boolean) => void;
-  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard") => void;
+  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing") => void;
   onSetAuthView: (view: AuthView) => void;
 };
 
@@ -36,54 +37,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onSetAppView,
   onSetAuthView,
 }) => {
-  const isLoggedIn = !!user;
-
   return (
     <div className="app builder-app">
       <div className="builder-shell">
-        <header className="home-nav">
-          <div className="home-logo">
-            <span className="home-logo-mark">◆</span>
-            <span className="home-logo-text">
-              Action<span>Maps</span>
-            </span>
-          </div>
-
-          <nav className="home-nav-actions">
-            {isLoggedIn && user?.email ? (
-              <>
-                {isAdmin && <span className="home-nav-user-pill">Admin</span>}
-                {!isAdmin && (
-                  <span className="home-nav-user-pill">{user.email}</span>
-                )}
-                <button
-                  type="button"
-                  className="home-nav-link"
-                  onClick={() => supabase.auth.signOut()}
-                >
-                  Log out
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="home-nav-link"
-                  onClick={() => onSetAuthView("login")}
-                >
-                  Log in
-                </button>
-                <button
-                  type="button"
-                  className="home-nav-cta"
-                  onClick={() => onSetAuthView("signup")}
-                >
-                  Sign up
-                </button>
-              </>
-            )}
-          </nav>
-        </header>
+        <AppHeader
+          user={user}
+          isAdmin={isAdmin}
+          onSetAuthView={onSetAuthView}
+          onGoToPricing={() => onSetAppView("pricing")}
+        />
 
         <main className="dashboard-main">
           <div className="dashboard-header">

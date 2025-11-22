@@ -1,0 +1,111 @@
+/* Info page styles */
+.info-main {
+  padding: 32px 0 40px;
+  max-width: 760px;
+}
+
+.info-card {
+  position: relative;
+  padding: 24px 22px 24px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  border: 1px solid #e5e7eb;
+}
+
+/* subtle gradient bar on top of the card */
+.info-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  padding-top: 3px;
+  background: linear-gradient(90deg, #a855f7, #6366f1, #22d3ee);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.7;
+}
+
+.info-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: #818cf8;
+  margin: 0 0 8px;
+}
+
+.info-title {
+  font-size: 26px;
+  margin: 0 0 8px;
+  color: #111827;
+}
+
+.info-lede {
+  font-size: 15px;
+  color: #4b5563;
+  margin: 0 0 18px;
+}
+
+.info-section {
+  margin-top: 18px;
+}
+
+.info-section h2 {
+  font-size: 18px;
+  margin: 0 0 6px;
+  color: #111827;
+}
+
+.info-section p,
+.info-section ul {
+  font-size: 14px;
+  color: #4b5563;
+  margin: 0;
+}
+
+.info-section ul {
+  padding-left: 18px;
+  margin-top: 4px;
+}
+
+.info-section li + li {
+  margin-top: 4px;
+}
+
+/* small colored dot bullets */
+.info-bullets li::marker {
+  color: #6366f1;
+}
+
+.info-highlight {
+  font-weight: 500;
+  color: #4f46e5;
+}
+
+/* CTA row */
+.info-ctas {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Make secondary button look intentional on light bg */
+.builder-app .hero-secondary-cta.info-secondary {
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.builder-app .hero-secondary-cta.info-secondary:hover {
+  background: #e5e7eb;
+}
+
+/* Keep primary CTA purple on light bg */
+.builder-app .hero-primary-cta {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: #f9fafb;
+}
+

@@ -18,6 +18,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!authView) return null;
 
+  const handleClose = () => {
+    setAuthError(null);
+    onClose();
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthError(null);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      // optional: redirect back to app root
+      // options: { redirectTo: window.location.origin },
+    });
+    if (error) {
+      setAuthError(error.message);
+    } else {
+      // Supabase will redirect; when it comes back, onAuthStateChange handles the rest
+      onClose();
+    }
+  };
+
   return (
     <div className="auth-overlay" role="dialog" aria-modal="true">
       <div className="auth-card">
@@ -25,7 +45,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           type="button"
           className="auth-close"
           aria-label="Close"
-          onClick={onClose}
+          onClick={handleClose}
         >
           ×
         </button>
@@ -36,12 +56,30 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <p className="auth-subtitle">
               Log in to access your saved Action Maps.
             </p>
+
             {authError && <p className="auth-error">{authError}</p>}
+
+            {/* Google sign-in */}
+            <button
+              type="button"
+              className="auth-social-btn"
+              onClick={handleGoogleSignIn}
+            >
+              <span className="auth-social-icon">G</span>
+              Continue with Google
+            </button>
+
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+
+            {/* Email/password login */}
             <form
               className="auth-form"
               onSubmit={async (e) => {
                 e.preventDefault();
                 setAuthError(null);
+
                 const formData = new FormData(e.currentTarget);
                 const email = (formData.get("email") as string)?.trim();
                 const password = (formData.get("password") as string)?.trim();
@@ -56,7 +94,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   setAuthError(error.message);
                 } else {
                   onClose();
-                  // onAuthStateChange will call loadProjectsForUser and pick builder vs dashboard
                 }
               }}
             >
@@ -93,20 +130,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </>
         ) : (
           <>
-            <h2 className="auth-title">Sign up</h2>
+            <h2 className="auth-title">Create your account</h2>
             <p className="auth-subtitle">
-              Create a free Action Maps account so your grids are saved.
+              Save your Action Maps and sync across devices.
             </p>
+
             {authError && <p className="auth-error">{authError}</p>}
+
+            {/* Google sign-up (same OAuth flow) */}
+            <button
+              type="button"
+              className="auth-social-btn"
+              onClick={handleGoogleSignIn}
+            >
+              <span className="auth-social-icon">G</span>
+              Continue with Google
+            </button>
+
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+
+            {/* Email/password sign-up */}
             <form
               className="auth-form"
               onSubmit={async (e) => {
                 e.preventDefault();
                 setAuthError(null);
+
                 const formData = new FormData(e.currentTarget);
                 const email = (formData.get("email") as string)?.trim();
                 const password = (formData.get("password") as string)?.trim();
                 const confirm = (formData.get("confirm") as string)?.trim();
+
                 if (!email || !password || password !== confirm) {
                   if (password !== confirm) {
                     setAuthError("Passwords do not match.");
@@ -122,9 +178,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 if (error) {
                   setAuthError(error.message);
                 } else {
-                  // Depending on Supabase settings, user may need email confirmation
-                  onClose();
-                  // new user -> no projects -> builder + modal
+                  // Go back to login so they can sign in
+                  onSwitchView("login");
                 }
               }}
             >
@@ -174,4 +229,3 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     </div>
   );
 };
-
