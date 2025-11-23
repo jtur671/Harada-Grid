@@ -94,9 +94,11 @@ var onRequestPost = /* @__PURE__ */ __name2(async (context) => {
 
 Your task is to generate a complete Harada Method action map from a user's goal.
 
+IMPORTANT: Keep the goal simple and concise. Use the user's exact words when possible, or make minimal refinements for clarity. Do NOT expand the goal with additional details, requirements, or explanations. The goal should be 1 sentence maximum.
+
 Return ONLY valid JSON in this exact format:
 {
-  "goal": "The refined main goal (1-2 sentences, clear and actionable)",
+  "goal": "The main goal (keep it simple, 1 sentence, use user's words when possible)",
   "pillars": ["Pillar 1", "Pillar 2", "Pillar 3", "Pillar 4", "Pillar 5", "Pillar 6", "Pillar 7", "Pillar 8"],
   "tasks": [
     ["Task 1 for Pillar 1", "Task 2 for Pillar 1", "Task 3 for Pillar 1", "Task 4 for Pillar 1", "Task 5 for Pillar 1", "Task 6 for Pillar 1", "Task 7 for Pillar 1", "Task 8 for Pillar 1"],
@@ -113,7 +115,7 @@ Return ONLY valid JSON in this exact format:
 }
 
 Requirements:
-- The goal should be refined and actionable (1-2 sentences)
+- The goal must be SIMPLE and CONCISE (1 sentence maximum). Use the user's exact words when possible. Do NOT add extra details, requirements, or explanations. If the user says "write a movie script", return "Write a movie script" or "Write a movie script by [timeframe]" - NOT "Write a movie script with compelling characters and clear structure."
 - You must provide exactly 8 pillars
 - Each pillar must have exactly 8 tasks
 - Pillars should be distinct, meaningful categories that support the main goal

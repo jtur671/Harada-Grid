@@ -42,6 +42,7 @@ type BuilderPageProps = {
   setAiModalOpen: (open: boolean) => void;
   aiGoalText: string;
   setAiGoalText: (text: string) => void;
+  isAiGenerating: boolean;
   resetOpen: boolean;
   setResetOpen: (open: boolean) => void;
   startModalOpen: boolean;
@@ -108,6 +109,7 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
   setAiModalOpen,
   aiGoalText,
   setAiGoalText,
+  isAiGenerating,
   resetOpen,
   setResetOpen,
   startModalOpen,
@@ -419,6 +421,7 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
                   onChange={(next) => setAiGoalText(next)}
                   onCancel={() => setAiModalOpen(false)}
                   onGenerate={onAiGenerate}
+                  isGenerating={isAiGenerating}
                 />
               )}
 

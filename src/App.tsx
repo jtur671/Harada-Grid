@@ -127,6 +127,7 @@ const App: React.FC = () => {
   const [templatesOpen, setTemplatesOpen] = useState<boolean>(false);
   const [aiModalOpen, setAiModalOpen] = useState<boolean>(false);
   const [aiGoalText, setAiGoalText] = useState<string>("");
+  const [isAiGenerating, setIsAiGenerating] = useState<boolean>(false);
   const [resetOpen, setResetOpen] = useState<boolean>(false);
   const [startModalOpen, setStartModalOpen] = useState<boolean>(false);
 
@@ -573,6 +574,8 @@ const App: React.FC = () => {
       return;
     }
 
+    setIsAiGenerating(true);
+
     try {
       // 1) Call your backend AI helper
       const response = await fetch(AI_HELPER_URL, {
@@ -587,6 +590,7 @@ const App: React.FC = () => {
         console.error("AI helper error:", response.status, await response.text());
         // you can swap this for a nicer toast UI later
         alert("Sorry, something went wrong generating your plan.");
+        setIsAiGenerating(false);
         return;
       }
 
@@ -608,13 +612,15 @@ const App: React.FC = () => {
       setState((prev) => withAppliedTemplate(prev, template));
       setActivePillar(0);
       setViewMode("grid");
+      
+      // 4) Close the modal on success
+      setAiModalOpen(false);
+      setAiGoalText("");
     } catch (error) {
       console.error("AI helper request failed", error);
       alert("Sorry, something went wrong generating your plan.");
     } finally {
-      // 4) Close the modal either way
-    setAiModalOpen(false);
-      setAiGoalText("");
+      setIsAiGenerating(false);
     }
   };
 
@@ -699,6 +705,7 @@ const App: React.FC = () => {
         setAiModalOpen={setAiModalOpen}
         aiGoalText={aiGoalText}
         setAiGoalText={setAiGoalText}
+        isAiGenerating={isAiGenerating}
         resetOpen={resetOpen}
         setResetOpen={setResetOpen}
         startModalOpen={startModalOpen}

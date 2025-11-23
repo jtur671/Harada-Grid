@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-l0xsvt/checked-fetch.js
+// ../.wrangler/tmp/bundle-WLfM5K/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -67,9 +67,11 @@ var onRequestPost = /* @__PURE__ */ __name(async (context) => {
 
 Your task is to generate a complete Harada Method action map from a user's goal.
 
+IMPORTANT: Keep the goal simple and concise. Use the user's exact words when possible, or make minimal refinements for clarity. Do NOT expand the goal with additional details, requirements, or explanations. The goal should be 1 sentence maximum.
+
 Return ONLY valid JSON in this exact format:
 {
-  "goal": "The refined main goal (1-2 sentences, clear and actionable)",
+  "goal": "The main goal (keep it simple, 1 sentence, use user's words when possible)",
   "pillars": ["Pillar 1", "Pillar 2", "Pillar 3", "Pillar 4", "Pillar 5", "Pillar 6", "Pillar 7", "Pillar 8"],
   "tasks": [
     ["Task 1 for Pillar 1", "Task 2 for Pillar 1", "Task 3 for Pillar 1", "Task 4 for Pillar 1", "Task 5 for Pillar 1", "Task 6 for Pillar 1", "Task 7 for Pillar 1", "Task 8 for Pillar 1"],
@@ -86,7 +88,7 @@ Return ONLY valid JSON in this exact format:
 }
 
 Requirements:
-- The goal should be refined and actionable (1-2 sentences)
+- The goal must be SIMPLE and CONCISE (1 sentence maximum). Use the user's exact words when possible. Do NOT add extra details, requirements, or explanations. If the user says "write a movie script", return "Write a movie script" or "Write a movie script by [timeframe]" - NOT "Write a movie script with compelling characters and clear structure."
 - You must provide exactly 8 pillars
 - Each pillar must have exactly 8 tasks
 - Pillars should be distinct, meaningful categories that support the main goal
@@ -701,7 +703,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-l0xsvt/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-WLfM5K/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -733,7 +735,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-l0xsvt/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-WLfM5K/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
