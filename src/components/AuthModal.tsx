@@ -25,17 +25,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleGoogleSignIn = async () => {
     setAuthError(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    if (error) {
-      setAuthError(error.message);
-    } else {
-      // Supabase will redirect; when it comes back, onAuthStateChange handles the rest
-      onClose();
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}${window.location.pathname}`,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
+      });
+      if (error) {
+        setAuthError(error.message);
+      } else {
+        // Supabase will redirect to Google, then back to our app
+        // onAuthStateChange in App.tsx will handle the session
+        onClose();
+      }
+    } catch (err) {
+      console.error("Google sign-in error:", err);
+      setAuthError("Failed to initiate Google sign-in. Please try again.");
     }
   };
 
