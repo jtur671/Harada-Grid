@@ -224,6 +224,156 @@ var onRequestOptions = /* @__PURE__ */ __name2(async () => {
     }
   });
 }, "onRequestOptions");
+var onRequestPost2 = /* @__PURE__ */ __name2(async (context) => {
+  try {
+    const apiKey = context.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: "OpenAI API key not configured" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+    const requestBody = await context.request.json();
+    const goal = requestBody.goal?.trim();
+    const currentPillar = requestBody.currentPillar?.trim();
+    if (!goal) {
+      return new Response(
+        JSON.stringify({ error: "Goal is required" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert in the Harada Method, a goal-setting framework that breaks down a main goal into 8 pillars.
+
+Your task is to generate 5 alternative pillar suggestions for a given main goal. Each pillar should be:
+- A distinct, meaningful category that supports the main goal
+- Concise (2-4 words typically)
+- Actionable and specific
+- Different from the current pillar (if provided)
+
+Return ONLY valid JSON in this exact format:
+{
+  "suggestions": ["Pillar suggestion 1", "Pillar suggestion 2", "Pillar suggestion 3", "Pillar suggestion 4", "Pillar suggestion 5"]
+}
+
+Requirements:
+- You must provide exactly 5 suggestions
+- Each suggestion should be a concise pillar name (2-4 words)
+- Suggestions should be diverse and cover different aspects of achieving the goal
+- If a current pillar is provided, make sure the suggestions are different from it
+- Return ONLY the JSON, no markdown, no code blocks, no explanation`
+          },
+          {
+            role: "user",
+            content: `Main goal: ${goal}${currentPillar ? `
+Current pillar: ${currentPillar}` : ""}
+
+Generate 5 alternative pillar suggestions for this goal.`
+          }
+        ],
+        temperature: 0.8,
+        response_format: { type: "json_object" }
+      })
+    });
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      console.error("OpenAI API error:", openaiResponse.status, errorText);
+      return new Response(
+        JSON.stringify({ error: "Failed to generate pillar suggestions" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+    const openaiData = await openaiResponse.json();
+    const content = openaiData.choices?.[0]?.message?.content;
+    if (!content) {
+      return new Response(
+        JSON.stringify({ error: "No content received from AI" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+    let aiResult;
+    try {
+      aiResult = JSON.parse(content);
+    } catch (parseError) {
+      console.error("Failed to parse AI response:", parseError);
+      return new Response(
+        JSON.stringify({ error: "Invalid response format from AI" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+    if (!Array.isArray(aiResult.suggestions)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid response structure from AI" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+    if (aiResult.suggestions.length !== 5) {
+      return new Response(
+        JSON.stringify({ error: "AI must return exactly 5 suggestions" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+    return new Response(JSON.stringify(aiResult), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
+    });
+  } catch (error) {
+    console.error("Pillar refine error:", error);
+    return new Response(
+      JSON.stringify({ error: "Internal server error" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+  }
+}, "onRequestPost");
+var onRequestOptions2 = /* @__PURE__ */ __name2(async () => {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    }
+  });
+}, "onRequestOptions");
 var routes = [
   {
     routePath: "/api/ai-helper",
@@ -238,6 +388,20 @@ var routes = [
     method: "POST",
     middlewares: [],
     modules: [onRequestPost]
+  },
+  {
+    routePath: "/api/pillar-refine",
+    mountPath: "/api",
+    method: "OPTIONS",
+    middlewares: [],
+    modules: [onRequestOptions2]
+  },
+  {
+    routePath: "/api/pillar-refine",
+    mountPath: "/api",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost2]
   }
 ];
 function lexer(str) {

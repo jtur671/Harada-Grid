@@ -19,11 +19,13 @@ type DashboardPageProps = {
   projects: ProjectSummary[];
   user: User | null;
   isAdmin: boolean;
+  isPro?: boolean;
+  hasReachedMapLimit?: boolean;
   authView: AuthView;
   onSetState: (state: HaradaState) => void;
   onSetViewMode: (mode: "map" | "grid") => void;
   onSetStartModalOpen: (open: boolean) => void;
-  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing") => void;
+  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing" | "support") => void;
   onSetAuthView: (view: AuthView) => void;
   onSetCurrentProjectId: (id: string | null) => void;
   onDeleteProject: (projectId: string) => void;
@@ -34,6 +36,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   projects,
   user,
   isAdmin,
+  isPro = false,
+  hasReachedMapLimit = false,
   authView,
   onSetState,
   onSetViewMode,
@@ -83,9 +87,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         <AppHeader
           user={user}
           isAdmin={isAdmin}
+          isPro={isPro}
           onSetAuthView={onSetAuthView}
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
+          onGoToSupport={() => onSetAppView("support")}
         />
 
         <main className="dashboard-main">
@@ -96,20 +102,36 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 Open an existing map or start a new one.
               </p>
             </div>
-            <button
-              type="button"
-              className="hero-primary-cta"
-              onClick={() => {
-                // new blank map + onboarding modal again
-                onSetState(createEmptyState());
-                onSetViewMode("grid");
-                onSetStartModalOpen(true);
-                onSetCurrentProjectId(null); // We're starting a fresh project
-                onSetAppView("builder");
-              }}
-            >
-              New map
-            </button>
+            {!hasReachedMapLimit && (
+              <button
+                type="button"
+                className="hero-primary-cta"
+                onClick={() => {
+                  // new blank map + onboarding modal again
+                  onSetState(createEmptyState());
+                  onSetViewMode("grid");
+                  onSetStartModalOpen(true);
+                  onSetCurrentProjectId(null); // We're starting a fresh project
+                  onSetAppView("builder");
+                }}
+              >
+                New map
+              </button>
+            )}
+            {hasReachedMapLimit && (
+              <div className="dashboard-limit-message">
+                <p className="dashboard-limit-text">
+                  You've reached the limit of 3 maps on the free plan.
+                </p>
+                <button
+                  type="button"
+                  className="hero-primary-cta"
+                  onClick={() => onSetAppView("pricing")}
+                >
+                  Upgrade to Pro
+                </button>
+              </div>
+            )}
           </div>
 
           {projects.length === 0 ? (

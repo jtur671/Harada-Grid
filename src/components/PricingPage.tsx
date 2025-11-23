@@ -4,13 +4,14 @@ import { AppHeader } from "./AppHeader";
 import { AuthModal } from "./AuthModal";
 
 type AuthView = "login" | "signup" | null;
-type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing";
+type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support";
 type Plan = "free" | "premium";
 type ModalType = "privacy" | "terms" | null;
 
 type PricingPageProps = {
   user: User | null;
   isAdmin: boolean;
+  isPro?: boolean;
   authView: AuthView;
   currentPlan: Plan | null;
   onSetAuthView: (view: AuthView) => void;
@@ -21,6 +22,7 @@ type PricingPageProps = {
 export const PricingPage: React.FC<PricingPageProps> = ({
   user,
   isAdmin,
+  isPro = false,
   authView,
   currentPlan,
   onSetAuthView,
@@ -36,13 +38,13 @@ export const PricingPage: React.FC<PricingPageProps> = ({
     <div className="app app-dark">
       <div className="home-shell">
         <AppHeader
-          showBackButton={true}
-          onBackClick={() => onSetAppView("home")}
           user={user}
           isAdmin={isAdmin}
+          isPro={isPro}
           onSetAuthView={onSetAuthView}
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
+          onGoToSupport={() => onSetAppView("support")}
         />
 
         <main className="home-main">

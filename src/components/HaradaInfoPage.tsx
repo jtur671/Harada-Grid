@@ -7,13 +7,15 @@ type AuthView = "login" | "signup" | null;
 type HaradaInfoPageProps = {
   user: User | null;
   isAdmin: boolean;
-  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing") => void;
+  isPro?: boolean;
+  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing" | "support") => void;
   onSetAuthView: (view: AuthView) => void;
 };
 
 export const HaradaInfoPage: React.FC<HaradaInfoPageProps> = ({
   user,
   isAdmin,
+  isPro = false,
   onSetAppView,
   onSetAuthView,
 }) => {
@@ -21,13 +23,13 @@ export const HaradaInfoPage: React.FC<HaradaInfoPageProps> = ({
     <div className="app builder-app">
       <div className="builder-shell">
         <AppHeader
-          showBackButton
-          onBackClick={() => onSetAppView("home")}
           user={user}
           isAdmin={isAdmin}
+          isPro={isPro}
           onSetAuthView={onSetAuthView}
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
+          onGoToSupport={() => onSetAppView("support")}
         />
 
         <main className="info-main">

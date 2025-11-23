@@ -8,6 +8,7 @@ import { TemplateModal } from "./TemplateModal";
 import { AiHelperModal } from "./AiHelperModal";
 import { ResetModal } from "./ResetModal";
 import { AuthModal } from "./AuthModal";
+import { PillarRefineModal } from "./PillarRefineModal";
 import { StartModal } from "./StartModal";
 import { AppHeader } from "./AppHeader";
 import { MiniDashboard } from "./MiniDashboard";
@@ -15,7 +16,7 @@ import { triggerPrintWithBodyClass } from "../utils/print";
 import { supabase } from "../supabaseClient";
 
 type AuthView = "login" | "signup" | null;
-type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing";
+type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support";
 
 type BuilderPageProps = {
   state: HaradaState;
@@ -52,8 +53,10 @@ type BuilderPageProps = {
   setAuthView: (view: AuthView) => void;
   user: User | null;
   isAdmin: boolean;
+  isPro?: boolean;
   isLoggedIn: boolean;
   progressForDay: string[];
+  allCompletedTasks: string[];
   diaryEntry: string;
   pillarCompletion: { defined: number; completed: number }[];
   totalDefinedTasks: number;
@@ -86,6 +89,15 @@ type BuilderPageProps = {
   }[];
   onOpenProjectFromSidebar: (id: string) => void;
   onNewMapFromSidebar?: () => void;
+  hasReachedMapLimit?: boolean;
+  // Pillar refine props
+  pillarRefineModalOpen: boolean;
+  setPillarRefineModalOpen: (open: boolean) => void;
+  pillarRefineIndex: number;
+  pillarRefineSuggestions: string[];
+  isPillarRefining: boolean;
+  onPillarRefine: (pillarIndex: number) => void;
+  onSelectRefinedPillar: (suggestion: string) => void;
 };
 
 export const BuilderPage: React.FC<BuilderPageProps> = ({
@@ -119,8 +131,10 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
   setAuthView,
   user,
   isAdmin,
+  isPro = false,
   isLoggedIn,
   progressForDay,
+  allCompletedTasks,
   diaryEntry,
   pillarCompletion,
   totalDefinedTasks,
@@ -147,6 +161,14 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
   projects,
   onOpenProjectFromSidebar,
   onNewMapFromSidebar,
+  hasReachedMapLimit = false,
+  pillarRefineModalOpen,
+  setPillarRefineModalOpen,
+  pillarRefineIndex,
+  pillarRefineSuggestions,
+  isPillarRefining,
+  onPillarRefine,
+  onSelectRefinedPillar,
 }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState(currentProjectTitle);
@@ -232,13 +254,13 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
     <div className="app builder-app">
       <div className="builder-shell">
         <AppHeader
-          showBackButton
-          onBackClick={() => onSetAppView("home")}
           user={user}
           isAdmin={isAdmin}
+          isPro={isPro}
           onSetAuthView={setAuthView}
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
+          onGoToSupport={() => onSetAppView("support")}
         />
 
         <main className="builder-main">
@@ -248,6 +270,7 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
               currentProjectId={currentProjectId || null}
               onSelectProject={onOpenProjectFromSidebar}
               onNewMap={onNewMapFromSidebar}
+              hasReachedMapLimit={hasReachedMapLimit}
             />
 
             <div className="builder-content">
@@ -383,6 +406,7 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
                   onGoalChange={onUpdateGoal}
                   onPillarChange={onUpdatePillar}
                   onTaskChange={onUpdateTask}
+                  onRefinePillar={onPillarRefine}
                 />
               ) : (
                 <ViewMode
@@ -390,6 +414,7 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
                   selectedDate={selectedDate}
                   diaryEntry={diaryEntry}
                   progressForDay={progressForDay}
+                  allCompletedTasks={allCompletedTasks}
                   pillarCompletion={pillarCompletion}
                   completedDefinedTasks={completedDefinedTasks}
                   totalDefinedTasks={totalDefinedTasks}
@@ -429,6 +454,18 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
                 <ResetModal
                   onCancel={() => setResetOpen(false)}
                   onConfirm={onConfirmReset}
+                />
+              )}
+
+              {pillarRefineModalOpen && (
+                <PillarRefineModal
+                  isOpen={pillarRefineModalOpen}
+                  currentPillar={state.pillars[pillarRefineIndex] || ""}
+                  goal={state.goal || ""}
+                  onClose={() => setPillarRefineModalOpen(false)}
+                  onSelect={onSelectRefinedPillar}
+                  isGenerating={isPillarRefining}
+                  suggestions={pillarRefineSuggestions}
                 />
               )}
             </section>

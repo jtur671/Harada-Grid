@@ -16,6 +16,7 @@ import { HaradaInfoPage } from "./components/HaradaInfoPage";
 import { HomePage } from "./components/HomePage";
 import { BuilderPage } from "./components/BuilderPage";
 import { PricingPage } from "./components/PricingPage";
+import { SupportPage } from "./components/SupportPage";
 import { supabase } from "./supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
@@ -24,11 +25,17 @@ import type { User } from "@supabase/supabase-js";
 // Can override with VITE_AI_HELPER_URL env var
 const AI_HELPER_URL =
   (import.meta.env.VITE_AI_HELPER_URL as string | undefined) ?? "/api/ai-helper";
+const PILLAR_REFINE_URL =
+  (import.meta.env.VITE_PILLAR_REFINE_URL as string | undefined) ?? "/api/pillar-refine";
 
-type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing";
+type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support";
 type AuthView = "login" | "signup" | null;
 
 type SubscriptionPlan = "free" | "premium" | null;
+
+// Map limits per plan
+const FREE_PLAN_MAP_LIMIT = 3;
+const PRO_PLAN_MAP_LIMIT = Infinity; // No limit for pro users
 
 export const deriveTitleFromState = (state: HaradaState) => {
   const trimmed = state.goal?.trim();
@@ -109,7 +116,7 @@ const App: React.FC = () => {
   const [state, setState] = useState<HaradaState>(() => loadState());
   const [mapTitle, setMapTitle] = useState<string>("Your Action Map");
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
-  const [selectedDate] = useState<string>(todayISO()); // static "today"
+  const [selectedDate, setSelectedDate] = useState<string>(todayISO());
   const [activePillar, setActivePillar] = useState<number>(0);
   const [viewMode, setViewMode] = useState<"map" | "grid">("grid");
   const [collapsedPillars, setCollapsedPillars] = useState<boolean[]>(() =>
@@ -128,6 +135,10 @@ const App: React.FC = () => {
   const [aiModalOpen, setAiModalOpen] = useState<boolean>(false);
   const [aiGoalText, setAiGoalText] = useState<string>("");
   const [isAiGenerating, setIsAiGenerating] = useState<boolean>(false);
+  const [pillarRefineModalOpen, setPillarRefineModalOpen] = useState<boolean>(false);
+  const [pillarRefineIndex, setPillarRefineIndex] = useState<number>(-1);
+  const [pillarRefineSuggestions, setPillarRefineSuggestions] = useState<string[]>([]);
+  const [isPillarRefining, setIsPillarRefining] = useState<boolean>(false);
   const [resetOpen, setResetOpen] = useState<boolean>(false);
   const [startModalOpen, setStartModalOpen] = useState<boolean>(false);
 
@@ -151,12 +162,39 @@ const App: React.FC = () => {
   const isLoggedIn = !!user;
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
   const isAdmin = !!user && !!adminEmail && user.email === adminEmail;
+  const isPro = plan === "premium";
+  
+  // Check if user has reached their map limit
+  const mapLimit = isPro ? PRO_PLAN_MAP_LIMIT : FREE_PLAN_MAP_LIMIT;
+  const hasReachedMapLimit = !isPro && projects.length >= FREE_PLAN_MAP_LIMIT;
+
+  // Debug: Log plan status (remove in production)
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      console.log("[Plan Status]", {
+        plan,
+        isPro,
+        email: user.email,
+        mapsCount: projects.length,
+        mapLimit,
+        hasReachedMapLimit,
+        note: "⚠️ Currently based on localStorage, not actual payment. In production, this should check Stripe subscription status from database.",
+      });
+    }
+  }, [plan, isPro, isLoggedIn, user, projects.length, mapLimit, hasReachedMapLimit]);
 
   const ensureProjectForCurrentState = async (
     initialState?: HaradaState
   ) => {
     if (!isLoggedIn || !user || currentProjectId) {
       console.log("[ensureProject] Skipping - isLoggedIn:", isLoggedIn, "user:", !!user, "currentProjectId:", currentProjectId);
+      return;
+    }
+
+    // Check map limit for free users BEFORE creating project
+    if (!isPro && projects.length >= FREE_PLAN_MAP_LIMIT) {
+      console.log("[ensureProject] Map limit reached for free user:", projects.length, ">=", FREE_PLAN_MAP_LIMIT);
+      alert(`You've reached the limit of ${FREE_PLAN_MAP_LIMIT} maps on the free plan. Upgrade to Pro to create unlimited maps.`);
       return;
     }
 
@@ -332,20 +370,22 @@ const App: React.FC = () => {
       const current = data.session?.user ?? null;
       setUser(current);
       if (current) {
-        // On initial load, check current view and preserve it if not home
-        // This prevents redirecting users who are already in builder/dashboard
+        // On initial load, STRICTLY preserve current view
         setAppView((currentView) => {
-          // If already in builder or dashboard, just load projects without changing view
-          if (currentView === "builder" || currentView === "dashboard") {
-            loadProjectsForUser(current, true);
-            return currentView;
-          }
-          // If on home, load projects and let it decide where to go
-          loadProjectsForUser(current, false);
-          return currentView; // loadProjectsForUser will set view
+          // Always preserve the current view, just load projects
+          loadProjectsForUser(current, true);
+          return currentView;
         });
       } else {
-        setAppView("home");
+        // Only set to home if not logged in AND not already in a logged-out view
+        setAppView((currentView) => {
+          // If already on home or pricing, stay there
+          if (currentView === "home" || currentView === "pricing" || currentView === "support") {
+            return currentView;
+          }
+          // Otherwise go to home
+          return "home";
+        });
         setProjects([]);
         setStartModalOpen(false);
       }
@@ -362,19 +402,26 @@ const App: React.FC = () => {
         const userChanged = (prevUser?.id !== u?.id);
         
         if (u) {
-          // Only redirect on actual sign in, never on token refresh
+          // STRICT: Only change view on actual SIGNED_IN event, never on token refresh or window focus
           setAppView((currentView) => {
-            // Always preserve view on token refresh or if already in builder/dashboard
-            if (event === "TOKEN_REFRESHED" || currentView === "builder" || currentView === "dashboard") {
-              // Just refresh projects list, don't change view
+            // Preserve view for all events except SIGNED_IN
+            if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+              // Token refresh or user update - just refresh projects, never change view
               loadProjectsForUser(u, true);
               return currentView;
-            } else if (event === "SIGNED_IN" || (userChanged && currentView === "home")) {
-              // Only load projects and potentially redirect on actual sign in
-              loadProjectsForUser(u, false);
-              return currentView; // loadProjectsForUser will set the view
+            } else if (event === "SIGNED_IN" && userChanged) {
+              // Only on actual sign in with user change
+              if (currentView === "home") {
+                // Only redirect from home, preserve all other views
+                loadProjectsForUser(u, false);
+                return currentView; // loadProjectsForUser will set the view
+              } else {
+                // Already in builder/dashboard/etc - preserve it
+                loadProjectsForUser(u, true);
+                return currentView;
+              }
             } else {
-              // For other events, preserve view
+              // For any other event, preserve view completely
               loadProjectsForUser(u, true);
               return currentView;
             }
@@ -396,6 +443,41 @@ const App: React.FC = () => {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Update selectedDate at midnight and on mount
+  useEffect(() => {
+    const updateDateIfNeeded = () => {
+      const today = todayISO();
+      if (selectedDate !== today) {
+        setSelectedDate(today);
+      }
+    };
+
+    // Update immediately on mount
+    updateDateIfNeeded();
+
+    // Calculate time until next midnight
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    const msUntilMidnight = midnight.getTime() - now.getTime();
+
+    // Set timeout for midnight
+    const midnightTimeout = setTimeout(() => {
+      updateDateIfNeeded();
+      // Then set up interval to check every minute (in case user's clock is slightly off)
+      const interval = setInterval(updateDateIfNeeded, 60000);
+      return () => clearInterval(interval);
+    }, msUntilMidnight);
+
+    // Also check periodically (every 5 minutes) in case the timeout was missed
+    const periodicCheck = setInterval(updateDateIfNeeded, 5 * 60 * 1000);
+
+    return () => {
+      clearTimeout(midnightTimeout);
+      clearInterval(periodicCheck);
+    };
+  }, [selectedDate]);
 
   // When a user logs in, try to load their saved grid
   useEffect(() => {
@@ -473,6 +555,7 @@ const App: React.FC = () => {
 
   const {
     progressForDay,
+    allCompletedTasks,
     diaryEntry,
     pillarCompletion,
     totalDefinedTasks,
@@ -624,6 +707,57 @@ const App: React.FC = () => {
     }
   };
 
+  type PillarRefineResponse = {
+    suggestions: string[];
+  };
+
+  const handlePillarRefine = async (pillarIndex: number) => {
+    if (pillarIndex < 0 || pillarIndex >= state.pillars.length) return;
+
+    setPillarRefineIndex(pillarIndex);
+    setPillarRefineModalOpen(true);
+    setPillarRefineSuggestions([]);
+    setIsPillarRefining(true);
+
+    try {
+      const response = await fetch(PILLAR_REFINE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          goal: state.goal || "",
+          currentPillar: state.pillars[pillarIndex] || "",
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Pillar refine error:", response.status, await response.text());
+        alert("Sorry, something went wrong generating pillar suggestions.");
+        setIsPillarRefining(false);
+        setPillarRefineModalOpen(false);
+        return;
+      }
+
+      const data = (await response.json()) as PillarRefineResponse;
+      setPillarRefineSuggestions(data.suggestions || []);
+    } catch (error) {
+      console.error("Pillar refine request failed", error);
+      alert("Sorry, something went wrong generating pillar suggestions.");
+    } finally {
+      setIsPillarRefining(false);
+    }
+  };
+
+  const handleSelectRefinedPillar = (suggestion: string) => {
+    if (pillarRefineIndex >= 0 && pillarRefineIndex < state.pillars.length) {
+      updatePillar(pillarRefineIndex, suggestion);
+    }
+    setPillarRefineModalOpen(false);
+    setPillarRefineIndex(-1);
+    setPillarRefineSuggestions([]);
+  };
+
   const handleSelectPlan = (nextPlan: "free" | "premium") => {
     setPlan(nextPlan);
     setAppView("builder");
@@ -637,6 +771,8 @@ const App: React.FC = () => {
         projects={projects}
         user={user}
         isAdmin={isAdmin}
+        isPro={isPro}
+        hasReachedMapLimit={hasReachedMapLimit}
         authView={authView}
         onSetState={setState}
         onSetViewMode={setViewMode}
@@ -655,6 +791,7 @@ const App: React.FC = () => {
       <HaradaInfoPage
         user={user}
         isAdmin={isAdmin}
+        isPro={isPro}
         onSetAppView={setAppView}
         onSetAuthView={setAuthView}
       />
@@ -666,11 +803,25 @@ const App: React.FC = () => {
       <PricingPage
         user={user}
         isAdmin={isAdmin}
+        isPro={isPro}
         authView={authView}
         currentPlan={plan}
         onSetAuthView={setAuthView}
         onSelectPlan={handleSelectPlan}
         onSetAppView={setAppView}
+      />
+    );
+  }
+
+  if (appView === "support") {
+    return (
+      <SupportPage
+        user={user}
+        isAdmin={isAdmin}
+        isPro={isPro}
+        onSetAuthView={setAuthView}
+        onGoToPricing={() => setAppView("pricing")}
+        onGoToDashboard={() => setAppView("dashboard")}
       />
     );
   }
@@ -688,7 +839,7 @@ const App: React.FC = () => {
         setMapTitle={setMapTitle}
         viewMode={viewMode}
         setViewMode={setViewMode}
-        selectedDate={selectedDate}
+              selectedDate={selectedDate}
               activePillar={activePillar}
         setActivePillar={setActivePillar}
         collapsedPillars={collapsedPillars}
@@ -715,11 +866,13 @@ const App: React.FC = () => {
         setAuthView={setAuthView}
         user={user}
         isAdmin={isAdmin}
+        isPro={isPro}
         isLoggedIn={isLoggedIn}
-        progressForDay={progressForDay}
+              progressForDay={progressForDay}
+              allCompletedTasks={allCompletedTasks}
               diaryEntry={diaryEntry}
               pillarCompletion={pillarCompletion}
-        totalDefinedTasks={totalDefinedTasks}
+              totalDefinedTasks={totalDefinedTasks}
               completedDefinedTasks={completedDefinedTasks}
               progressPercent={progressPercent}
         onUpdateGoal={updateGoal}
@@ -750,6 +903,14 @@ const App: React.FC = () => {
           setStartModalOpen(true);
           setAppView("builder");
         }}
+        hasReachedMapLimit={hasReachedMapLimit}
+        pillarRefineModalOpen={pillarRefineModalOpen}
+        setPillarRefineModalOpen={setPillarRefineModalOpen}
+        pillarRefineIndex={pillarRefineIndex}
+        pillarRefineSuggestions={pillarRefineSuggestions}
+        isPillarRefining={isPillarRefining}
+        onPillarRefine={handlePillarRefine}
+        onSelectRefinedPillar={handleSelectRefinedPillar}
       />
     );
   }
@@ -758,6 +919,7 @@ const App: React.FC = () => {
     <HomePage
       user={user}
       isAdmin={isAdmin}
+      isPro={isPro}
       authView={authView}
       exampleId={exampleId}
       exampleState={exampleState}

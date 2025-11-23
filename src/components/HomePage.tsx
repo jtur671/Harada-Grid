@@ -7,11 +7,12 @@ import { AppHeader } from "./AppHeader";
 
 type AuthView = "login" | "signup" | null;
 type ExampleId = "career" | "sidebiz" | "wellbeing";
-type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing";
+type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support";
 
 type HomePageProps = {
   user: User | null;
   isAdmin: boolean;
+  isPro?: boolean;
   authView: AuthView;
   exampleId: ExampleId;
   exampleState: HaradaState;
@@ -23,6 +24,7 @@ type HomePageProps = {
 export const HomePage: React.FC<HomePageProps> = ({
   user,
   isAdmin,
+  isPro = false,
   authView,
   exampleId,
   exampleState,
@@ -34,11 +36,14 @@ export const HomePage: React.FC<HomePageProps> = ({
     <div className="app app-dark">
       <div className="home-shell">
         <AppHeader
+          showBackButton={false}
           user={user}
           isAdmin={isAdmin}
+          isPro={isPro}
           onSetAuthView={onSetAuthView}
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
+          onGoToSupport={() => onSetAppView("support")}
         />
 
         <main className="home-main">
@@ -252,6 +257,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 collapsedPillars={Array(8).fill(false)}
                 onTogglePillar={() => {}}
                 progressForDay={[]}
+                allCompletedTasks={[]}
                 onToggleTask={() => {}}
               />
             </div>

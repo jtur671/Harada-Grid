@@ -7,6 +7,7 @@
 @import "./styles/home.css";
 @import "./styles/auth.css";
 @import "./styles/pricing.css";
+@import "./styles/support.css";
 
 /* ---------- Base layout ---------- */
 
@@ -53,6 +54,10 @@ body {
   max-width: 1200px;
   margin: 24px auto 40px;
   padding: 0 16px 40px;
+}
+
+.app.builder-app {
+  padding: 0 24px !important;
 }
 
 /* ---------- Header ---------- */

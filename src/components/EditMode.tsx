@@ -11,6 +11,7 @@ type EditModeProps = {
     taskIndex: number,
     value: string
   ) => void;
+  onRefinePillar?: (pillarIndex: number) => void;
 };
 
 export const EditMode: React.FC<EditModeProps> = ({
@@ -20,6 +21,7 @@ export const EditMode: React.FC<EditModeProps> = ({
   onGoalChange,
   onPillarChange,
   onTaskChange,
+  onRefinePillar,
 }) => (
   <>
     <div className="goal-map">
@@ -62,14 +64,32 @@ export const EditMode: React.FC<EditModeProps> = ({
         <label htmlFor={`pillar-input-${activePillar}`} className="pillar-detail-label">
           Selected Pillar
         </label>
-        <input
-          id={`pillar-input-${activePillar}`}
-          className="pillar-name-input"
-          value={state.pillars[activePillar] || ""}
-          onChange={(e) => onPillarChange(activePillar, e.target.value)}
-          placeholder={`Pillar ${activePillar + 1}`}
-          aria-label={`Pillar ${activePillar + 1} name`}
-        />
+        <div className="pillar-input-wrapper">
+          <input
+            id={`pillar-input-${activePillar}`}
+            className="pillar-name-input"
+            type="text"
+            value={state.pillars[activePillar] || ""}
+            onChange={(e) => onPillarChange(activePillar, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
+              }
+            }}
+            placeholder={`Pillar ${activePillar + 1}`}
+            aria-label={`Pillar ${activePillar + 1} name`}
+          />
+          {onRefinePillar && (
+            <button
+              type="button"
+              className="pillar-refine-ai-btn"
+              onClick={() => onRefinePillar(activePillar)}
+              title="Get 5 AI suggestions for this pillar"
+            >
+              ✨ Refine with AI
+            </button>
+          )}
+        </div>
         <span className="pillar-detail-meta">8 actions</span>
       </div>
 

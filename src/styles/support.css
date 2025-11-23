@@ -1,0 +1,334 @@
+/* Support page styles */
+.support-main {
+  padding: 40px 0 60px;
+  max-width: 1000px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, #f9fafb 0%, #ffffff 100%);
+  min-height: calc(100vh - 72px);
+}
+
+.support-container {
+  padding: 0 24px;
+}
+
+.support-header {
+  margin-bottom: 48px;
+  text-align: center;
+  position: relative;
+}
+
+.support-header::before {
+  content: "💬";
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 48px;
+  opacity: 0.1;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateX(-50%) translateY(0px); }
+  50% { transform: translateX(-50%) translateY(-10px); }
+}
+
+.support-title {
+  margin: 0 0 12px;
+  font-size: 42px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+.support-subtitle {
+  margin: 0;
+  font-size: 18px;
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.support-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+  padding: 0 24px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.support-tab {
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  margin-bottom: -2px;
+}
+
+.support-tab:hover {
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.support-tab-active {
+  color: #6366f1;
+  font-weight: 600;
+  border-bottom-color: #6366f1;
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.support-tab-active::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%);
+  border-radius: 2px 2px 0 0;
+}
+
+.support-content {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.support-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.support-section-title {
+  margin: 0 0 24px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  padding-bottom: 12px;
+  border-bottom: 3px solid;
+  border-image: linear-gradient(90deg, #6366f1 0%, #a855f7 100%) 1;
+  position: relative;
+  display: inline-block;
+}
+
+.support-section-title::after {
+  content: "";
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%);
+  border-radius: 2px;
+}
+
+.support-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 28px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.support-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+
+.support-card:hover {
+  border-color: #6366f1;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.15);
+  transform: translateY(-2px);
+}
+
+.support-card:hover::before {
+  transform: scaleX(1);
+}
+
+.support-card-highlight {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-color: #f59e0b;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.2);
+}
+
+.support-card-highlight:hover {
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3);
+  transform: translateY(-3px);
+}
+
+.support-card-note {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 14px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.support-card-title {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.support-card-title::before {
+  content: "✨";
+  font-size: 20px;
+  opacity: 0.8;
+}
+
+.support-card-text {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.support-card-text:last-child {
+  margin-bottom: 0;
+}
+
+.support-list {
+  margin: 0;
+  padding-left: 0;
+  font-size: 15px;
+  color: #374151;
+  line-height: 1.8;
+  list-style: none;
+}
+
+.support-list li {
+  margin-bottom: 12px;
+  padding-left: 28px;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+.support-list li::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: #6366f1;
+  font-weight: bold;
+  font-size: 18px;
+  transition: transform 0.2s ease;
+}
+
+.support-list li:hover {
+  transform: translateX(4px);
+}
+
+.support-list li:hover::before {
+  transform: translateX(4px);
+  color: #a855f7;
+}
+
+.support-list li:last-child {
+  margin-bottom: 0;
+}
+
+.support-list strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.support-link {
+  color: #6366f1;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.support-link:hover {
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.1);
+  transform: translateX(2px);
+}
+
+.support-link::after {
+  content: "→";
+  font-size: 14px;
+  transition: transform 0.2s ease;
+}
+
+.support-link:hover::after {
+  transform: translateX(4px);
+}
+
+@media (max-width: 768px) {
+  .support-main {
+    padding: 32px 0 48px;
+  }
+
+  .support-container {
+    padding: 0 16px;
+  }
+
+  .support-title {
+    font-size: 28px;
+  }
+
+  .support-subtitle {
+    font-size: 14px;
+  }
+
+  .support-section-title {
+    font-size: 20px;
+  }
+
+  .support-card {
+    padding: 20px;
+  }
+
+  .support-card-title {
+    font-size: 16px;
+  }
+
+  .support-card-text,
+  .support-list {
+    font-size: 14px;
+  }
+
+  .support-tabs {
+    padding: 0 16px;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .support-tab {
+    padding: 10px 16px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+}
+

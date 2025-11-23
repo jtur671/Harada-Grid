@@ -17,6 +17,7 @@ export type TraditionalGridProps = {
   state: HaradaState;
   collapsedPillars: boolean[];
   onTogglePillar: (pillarIndex: number) => void;
-  progressForDay: string[];
+  progressForDay: string[]; // Tasks completed today (for stats)
+  allCompletedTasks: string[]; // All tasks completed on any date (for display)
   onToggleTask: (taskId: string) => void;
 };

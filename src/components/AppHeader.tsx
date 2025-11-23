@@ -9,9 +9,11 @@ type AppHeaderProps = {
   onBackClick?: () => void;
   user: User | null;
   isAdmin: boolean;
+  isPro?: boolean;
   onSetAuthView: (view: AuthView) => void;
   onGoToPricing?: () => void;
   onGoToDashboard?: () => void;
+  onGoToSupport?: () => void;
 };
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -19,9 +21,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onBackClick,
   user,
   isAdmin,
+  isPro = false,
   onSetAuthView,
   onGoToPricing,
   onGoToDashboard,
+  onGoToSupport,
 }) => {
   const isLoggedIn = !!user;
 
@@ -35,7 +39,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       </div>
 
       <nav className="home-nav-actions">
-        {showBackButton && onBackClick && (
+        {/* Only show back button when NOT logged in (for marketing pages) */}
+        {showBackButton && onBackClick && !isLoggedIn && (
           <button
             type="button"
             className="home-nav-link"
@@ -56,6 +61,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </button>
         )}
 
+        {/* Support link */}
+        {onGoToSupport && (
+          <button
+            type="button"
+            className="home-nav-link"
+            onClick={onGoToSupport}
+          >
+            Support
+          </button>
+        )}
+
         {/* Dashboard link, only when logged in */}
         {isLoggedIn && onGoToDashboard && (
           <button
@@ -71,7 +87,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <>
             {isAdmin && <span className="home-nav-user-pill">Admin</span>}
             {!isAdmin && (
-              <span className="home-nav-user-pill">{user.email}</span>
+              <div className="home-nav-user-info">
+                <span className="home-nav-user-pill">{user.email}</span>
+                {isPro && <span className="home-nav-pro-badge">Pro</span>}
+              </div>
             )}
             <button
               type="button"

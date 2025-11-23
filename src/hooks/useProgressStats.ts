@@ -9,7 +9,8 @@ type ProgressSummary = {
 };
 
 export type ProgressStats = {
-  progressForDay: string[];
+  progressForDay: string[]; // Tasks completed today
+  allCompletedTasks: string[]; // All tasks completed on any date (cumulative)
   diaryEntry: string;
   pillarCompletion: ProgressSummary[];
   totalDefinedTasks: number;
@@ -24,6 +25,27 @@ export const useProgressStats = (
 ): ProgressStats => {
   const progressForDay = state.progressByDate[selectedDate] ?? [];
   const diaryEntry = state.diaryByDate[selectedDate] ?? "";
+  
+  // Get all completed tasks from all dates (cumulative view)
+  // This ensures tasks completed on previous days still show as green in the grid
+  const allCompletedTasks = useMemo(() => {
+    const completedSet = new Set<string>();
+    // Add tasks from all dates in progressByDate
+    Object.values(state.progressByDate).forEach((taskIds) => {
+      taskIds.forEach((id) => completedSet.add(id));
+    });
+    // For dates that were fully completed, mark all defined tasks as done
+    state.completedDates?.forEach(() => {
+      state.pillars.forEach((_, pIndex) => {
+        state.tasks[pIndex].forEach((_, tIndex) => {
+          if (state.tasks[pIndex][tIndex].trim()) {
+            completedSet.add(getTaskId(pIndex, tIndex));
+          }
+        });
+      });
+    });
+    return Array.from(completedSet);
+  }, [state.progressByDate, state.completedDates, state.pillars, state.tasks]);
 
   const { pillarCompletion, totalDefinedTasks, completedDefinedTasks } =
     useMemo(() => {
@@ -85,6 +107,7 @@ export const useProgressStats = (
 
   return {
     progressForDay,
+    allCompletedTasks,
     diaryEntry,
     pillarCompletion,
     totalDefinedTasks,

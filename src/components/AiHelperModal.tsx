@@ -47,6 +47,13 @@ export const AiHelperModal: React.FC<AiHelperModalProps> = ({
           className="ai-goal-input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter submits, Shift+Enter creates new line
+            if (e.key === "Enter" && !e.shiftKey && !isGenerating && value.trim()) {
+              e.preventDefault();
+              onGenerate();
+            }
+          }}
           placeholder="Example: Run a full marathon by November, feeling strong and injury-free."
           aria-label="Enter your main goal for AI generation"
           disabled={isGenerating}

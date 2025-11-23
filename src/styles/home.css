@@ -20,7 +20,11 @@
   padding: 14px 0;
   backdrop-filter: blur(18px);
   background: radial-gradient(circle at top left, rgba(76, 29, 149, 0.4), rgba(15, 23, 42, 0.92));
-  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+  border-bottom: 0.5px solid rgba(148, 163, 184, 0.25);
+}
+
+.home-nav > * {
+  padding: 0 16px;
 }
 
 .home-logo {
@@ -56,6 +60,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 .home-nav-link {
@@ -486,6 +491,12 @@
   color: #e5e7eb;
 }
 
+.home-nav-user-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .home-nav-user-pill {
   font-size: 11px;
   padding: 4px 10px;
@@ -504,6 +515,19 @@
   background: #ffffff;
   border-color: #e5e7eb;
   color: #374151;
+}
+
+.home-nav-pro-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  border: 1px solid rgba(217, 119, 6, 0.8);
+  box-shadow: 0 2px 4px rgba(217, 119, 6, 0.2);
 }
 
 /* Auth overlay */

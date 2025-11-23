@@ -12,6 +12,7 @@ type MiniDashboardProps = {
   currentProjectId: string | null;
   onSelectProject: (id: string) => void;
   onNewMap?: () => void;
+  hasReachedMapLimit?: boolean;
 };
 
 export const MiniDashboard: React.FC<MiniDashboardProps> = ({
@@ -19,6 +20,7 @@ export const MiniDashboard: React.FC<MiniDashboardProps> = ({
   currentProjectId,
   onSelectProject,
   onNewMap,
+  hasReachedMapLimit = false,
 }) => {
   const [isOpen, setIsOpen] = React.useState(true);
 
@@ -51,7 +53,7 @@ export const MiniDashboard: React.FC<MiniDashboardProps> = ({
               </div>
             </div>
 
-            {onNewMap && (
+            {onNewMap && !hasReachedMapLimit && (
               <button
                 type="button"
                 className="mini-dashboard-new"
@@ -127,7 +129,7 @@ export const MiniDashboard: React.FC<MiniDashboardProps> = ({
           ) : (
             <div className="mini-dashboard-icon-placeholder" />
           )}
-          {onNewMap && (
+          {onNewMap && !hasReachedMapLimit && (
             <button
               type="button"
               className="mini-dashboard-new-collapsed"

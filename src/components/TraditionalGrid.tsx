@@ -6,7 +6,8 @@ export const TraditionalGrid: React.FC<TraditionalGridProps> = ({
   state,
   collapsedPillars,
   onTogglePillar,
-  progressForDay,
+  progressForDay: _progressForDay, // Keep for type compatibility but use allCompletedTasks for display
+  allCompletedTasks,
   onToggleTask,
 }) => {
   const cells: CellKind[][] = [];
@@ -80,7 +81,8 @@ export const TraditionalGrid: React.FC<TraditionalGridProps> = ({
             } else if (cell.type === "task") {
               const collapsed = collapsedPillars[cell.pillarIndex];
               const taskId = getTaskId(cell.pillarIndex, cell.taskIndex);
-              const done = progressForDay.includes(taskId);
+              // Use allCompletedTasks so tasks from previous days still show as green
+              const done = allCompletedTasks.includes(taskId);
               onClick = () => onToggleTask(taskId);
 
 

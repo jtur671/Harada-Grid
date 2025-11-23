@@ -10,6 +10,7 @@ type ViewModeProps = {
   selectedDate: string;
   diaryEntry: string;
   progressForDay: string[];
+  allCompletedTasks: string[];
   pillarCompletion: { defined: number; completed: number }[];
   completedDefinedTasks: number;
   totalDefinedTasks: number;
@@ -31,6 +32,7 @@ export const ViewMode: React.FC<ViewModeProps> = ({
   selectedDate,
   diaryEntry,
   progressForDay,
+  allCompletedTasks,
   pillarCompletion,
   completedDefinedTasks,
   totalDefinedTasks,
@@ -183,6 +185,9 @@ export const ViewMode: React.FC<ViewModeProps> = ({
           onChange={(e) => onDiaryChange(e.target.value)}
           placeholder="Reflect on today. What worked? What didn't? What will you adjust tomorrow?"
         />
+        <p className="diary-auto-save-label">
+          Auto-saves as you type. No need to save manually.
+        </p>
 
         <div className="diary-history">
           <button
@@ -248,6 +253,7 @@ export const ViewMode: React.FC<ViewModeProps> = ({
         collapsedPillars={collapsedPillars}
         onTogglePillar={onTogglePillar}
         progressForDay={progressForDay}
+        allCompletedTasks={allCompletedTasks}
         onToggleTask={onToggleTask}
       />
     </>
