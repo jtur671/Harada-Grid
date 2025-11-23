@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { TEMPLATES, type Template } from "./templates";
-import type { HaradaState } from "./types";
-import { todayISO } from "./utils/date";
+import type { HaradaState, AppView, AuthView, SubscriptionPlan, ExampleId } from "./types";
 import { loadState, saveState, createEmptyState } from "./utils/harada";
 import {
   withGoal,
@@ -11,6 +10,12 @@ import {
   withAppliedTemplate,
 } from "./utils/stateHelpers";
 import { useProgressStats } from "./hooks/useProgressStats";
+import { useDateSync } from "./hooks/useDateSync";
+import { useProjects } from "./hooks/useProjects";
+import { getInitialPlan, hasDismissedStartModal, setStartModalDismissed, setPlan as savePlanToStorage } from "./utils/storage";
+import { buildExampleState } from "./utils/projects";
+import { generateAiMap, refinePillar, applyAiResponseToState } from "./services/ai";
+import { FREE_PLAN_MAP_LIMIT, PRO_PLAN_MAP_LIMIT } from "./config/constants";
 import { DashboardPage } from "./components/DashboardPage";
 import { HaradaInfoPage } from "./components/HaradaInfoPage";
 import { HomePage } from "./components/HomePage";
@@ -20,103 +25,10 @@ import { SupportPage } from "./components/SupportPage";
 import { supabase } from "./supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
-// For local dev, use relative path (Vite proxy will forward to wrangler)
-// For production, defaults to /api/ai-helper (same domain)
-// Can override with VITE_AI_HELPER_URL env var
-const AI_HELPER_URL =
-  (import.meta.env.VITE_AI_HELPER_URL as string | undefined) ?? "/api/ai-helper";
-const PILLAR_REFINE_URL =
-  (import.meta.env.VITE_PILLAR_REFINE_URL as string | undefined) ?? "/api/pillar-refine";
-
-type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support";
-type AuthView = "login" | "signup" | null;
-
-type SubscriptionPlan = "free" | "premium" | null;
-
-// Map limits per plan
-const FREE_PLAN_MAP_LIMIT = 3;
-const PRO_PLAN_MAP_LIMIT = Infinity; // No limit for pro users
-
-export const deriveTitleFromState = (state: HaradaState) => {
-  const trimmed = state.goal?.trim();
-  if (trimmed) {
-    return trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed;
-  }
-  return "Untitled map";
-};
-
-const getNextDefaultTitle = (projects: ProjectSummary[]): string => {
-  const base = "Action Map ";
-
-  let max = 0;
-
-  for (const p of projects) {
-    const name = (p.title ?? "").trim();
-    if (name.toLowerCase().startsWith(base.toLowerCase())) {
-      const suffix = name.slice(base.length).trim();
-      const num = parseInt(suffix, 10);
-      if (!Number.isNaN(num) && num > max) {
-        max = num;
-      }
-    }
-  }
-
-  return `${base}${max + 1}`;
-};
-
-const PLAN_STORAGE_KEY = "actionmaps-plan";
-const START_MODAL_DISMISSED_KEY = "actionmaps-start-modal-dismissed";
-
-const getInitialPlan = (): SubscriptionPlan => {
-  if (typeof window === "undefined") return null;
-  const stored = window.localStorage.getItem(PLAN_STORAGE_KEY);
-  return stored === "free" || stored === "premium" ? stored : null;
-};
-
-const hasDismissedStartModal = (): boolean => {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(START_MODAL_DISMISSED_KEY) === "true";
-};
-
-const setStartModalDismissed = (): void => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(START_MODAL_DISMISSED_KEY, "true");
-};
-
-type ProjectSummary = {
-  id: string;
-  title: string | null;
-  goal: string | null;
-  updated_at: string;
-};
-
-type ExampleId = "career" | "sidebiz" | "wellbeing";
-
-const buildExampleState = (id: ExampleId): HaradaState => {
-  const templateIdMap: Record<ExampleId, string> = {
-    career: "career",
-    sidebiz: "sidebiz",
-    wellbeing: "wellbeing",
-  };
-
-  const template = TEMPLATES.find((t) => t.id === templateIdMap[id]);
-  const base = createEmptyState();
-
-  if (!template) return base;
-
-  return {
-    ...base,
-    goal: template.goal,
-    pillars: template.pillars,
-    tasks: template.tasks,
-  };
-};
-
 const App: React.FC = () => {
   const [state, setState] = useState<HaradaState>(() => loadState());
   const [mapTitle, setMapTitle] = useState<string>("Your Action Map");
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(todayISO());
+  const selectedDate = useDateSync();
   const [activePillar, setActivePillar] = useState<number>(0);
   const [viewMode, setViewMode] = useState<"map" | "grid">("grid");
   const [collapsedPillars, setCollapsedPillars] = useState<boolean[]>(() =>
@@ -148,28 +60,44 @@ const App: React.FC = () => {
   );
 
   const [appView, setAppView] = useState<AppView>("home");
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [authView, setAuthView] = useState<AuthView>(null);
   const [plan, setPlan] = useState<SubscriptionPlan>(getInitialPlan());
-  // Track if we've completed initial auth check - after this, NEVER auto-redirect
-  // Use ref to avoid stale closure issues
   const authInitializedRef = useRef<boolean>(false);
-
-  const handleProjectTitleUpdated = (id: string, newTitle: string) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, title: newTitle } : p))
-    );
-  };
 
   const isLoggedIn = !!user;
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
   const isAdmin = !!user && !!adminEmail && user.email === adminEmail;
   const isPro = plan === "premium";
-  
+
+  // Use projects hook
+  const {
+    projects,
+    currentProjectId,
+    setCurrentProjectId,
+    loadProjects,
+    createProject,
+    openProject: openProjectFromHook,
+    deleteProject,
+    updateProjectTitle,
+    updateProjectInList,
+  } = useProjects({
+    user,
+    isPro,
+    plan,
+    onViewChange: setAppView,
+    onViewModeChange: setViewMode,
+    onStartModalChange: setStartModalOpen,
+    hasDismissedStartModal,
+  });
+
   // Check if user has reached their map limit
   const mapLimit = isPro ? PRO_PLAN_MAP_LIMIT : FREE_PLAN_MAP_LIMIT;
   const hasReachedMapLimit = !isPro && projects.length >= FREE_PLAN_MAP_LIMIT;
+
+  const handleProjectTitleUpdated = (id: string, newTitle: string) => {
+    updateProjectTitle(id, newTitle);
+  };
 
   // Debug: Log plan status (remove in production)
   useEffect(() => {
@@ -194,162 +122,29 @@ const App: React.FC = () => {
       return;
     }
 
-    // Check map limit for free users BEFORE creating project
-    if (!isPro && projects.length >= FREE_PLAN_MAP_LIMIT) {
-      console.log("[ensureProject] Map limit reached for free user:", projects.length, ">=", FREE_PLAN_MAP_LIMIT);
-      alert(`You've reached the limit of ${FREE_PLAN_MAP_LIMIT} maps on the free plan. Upgrade to Pro to create unlimited maps.`);
-      return;
-    }
-
     const snapshot = initialState ?? state;
-    const title = getNextDefaultTitle(projects);
-
-    console.log("[ensureProject] Creating project:", { title, goal: snapshot.goal, projectsCount: projects.length, userId: user.id });
-
-    // Check if Supabase is properly configured
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    if (!supabaseUrl || supabaseUrl === "YOUR_SUPABASE_URL" || supabaseUrl.includes("placeholder")) {
-      console.error("[ensureProject] ERROR: Supabase not configured! Check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY");
-      alert("Database not configured. Maps will not be saved. Please check your Supabase configuration.");
-      return;
-    }
-
-    try {
-      // Insert without goal column (goal is stored in state.goal)
-      const insertPayload = {
-        user_id: user.id,
-        title,
-        state: snapshot,
-      };
-
-      const { data, error } = await supabase
-        .from("action_maps")
-        .insert(insertPayload)
-        .select("id,title,updated_at")
-        .single();
-
-      if (error) {
-        console.error("[ensureProject] Error creating project:", error);
-        console.error("[ensureProject] Full error details:", JSON.stringify(error, null, 2));
-        alert(`Failed to save map: ${error.message}. Check the browser console for details.`);
-        return;
-      }
-
-      if (data) {
-        // Extract goal from state for display
-        const goalFromState = snapshot.goal || null;
-        const project = { ...data, goal: goalFromState } as ProjectSummary;
-        setCurrentProjectId(project.id);
-        setProjects((prev) => [project, ...prev]);
-        console.log("[ensureProject] ✅ Project created successfully:", project.id, project.title);
-      } else {
-        console.error("[ensureProject] No data returned from insert");
-        alert("Failed to save map: No data returned from database.");
-      }
-    } catch (e) {
-      console.error("[ensureProject] Exception creating project:", e);
-      alert(`Failed to save map: ${e instanceof Error ? e.message : String(e)}`);
+    const projectId = await createProject(snapshot, snapshot);
+    if (projectId) {
+      setCurrentProjectId(projectId);
     }
   };
 
-  const loadProjectsForUser = async (u: User, preserveView = false) => {
-    // Load projects with state to extract goal
-    const { data, error } = await supabase
-      .from("action_maps")
-      .select("id,title,updated_at,state")
-      .eq("user_id", u.id)
-      .order("updated_at", { ascending: false });
-
-    if (error) {
-      console.error("Failed to load projects", error);
-      return;
-    }
-
-    // Extract goal from state for each project
-    const list = ((data ?? []).map(p => {
-      const state = (p as any).state as HaradaState | null;
-      const goal = state?.goal || null;
-      return {
-        id: p.id,
-        title: p.title,
-        goal,
-        updated_at: p.updated_at,
-      };
-    })) as ProjectSummary[];
-    setProjects(list);
-    
-    // Only reset currentProjectId if we're not preserving the view
-    if (!preserveView) {
-      setCurrentProjectId(null); // Don't assume which project is open
-    }
-
-    // Only change view if we're not preserving it
-    if (!preserveView) {
-      if (list.length === 0) {
-        // Brand-new user: send them to pricing first
-        if (!plan) {
-          setAppView("pricing");
-          setStartModalOpen(false);
-        } else {
-          // If they already chose a plan on this device, go straight to builder
-          setAppView("builder");
-          setViewMode("grid");
-          // Only show start modal if they haven't dismissed it before
-          setStartModalOpen(!hasDismissedStartModal());
-        }
-      } else {
-        // Returning user: land on dashboard
-        setAppView("dashboard");
-        setStartModalOpen(false);
-      }
-    }
+  const loadProjectsForUser = async (_u: User, preserveView = false) => {
+    await loadProjects(preserveView);
   };
 
   const openProject = async (projectId: string) => {
-    // Load the project's state from Supabase
-    const { data, error } = await supabase
-      .from("action_maps")
-      .select("state")
-      .eq("id", projectId)
-      .single();
-
-    if (error || !data?.state) {
-      console.error("Failed to open project", error);
-      return;
+    const projectState = await openProjectFromHook(projectId);
+    if (projectState) {
+      setState(projectState);
+      setViewMode("grid");
+      setStartModalOpen(false);
+      setAppView("builder");
     }
-
-    setState(data.state as HaradaState);
-    setCurrentProjectId(projectId);
-    setViewMode("grid"); // or keep current viewMode if you prefer
-    setStartModalOpen(false);
-    setAppView("builder");
   };
 
   const handleDeleteProject = async (projectId: string) => {
-    if (!user) return;
-
-    try {
-      const { error } = await supabase
-        .from("action_maps")
-        .delete()
-        .eq("id", projectId)
-        .eq("user_id", user.id);
-
-      if (error) {
-        console.error("Error deleting project", error);
-        return;
-      }
-
-      // Remove from projects list
-      setProjects((prev) => prev.filter((p) => p.id !== projectId));
-
-      // If the deleted project was the current one, clear it
-      if (currentProjectId === projectId) {
-        setCurrentProjectId(null);
-      }
-    } catch (e) {
-      console.error("Error deleting project", e);
-    }
+    await deleteProject(projectId);
   };
 
   const handleExampleChange = (id: ExampleId) => {
@@ -363,8 +158,7 @@ const App: React.FC = () => {
 
   // Persist plan to localStorage
   useEffect(() => {
-    if (!plan) return;
-    window.localStorage.setItem(PLAN_STORAGE_KEY, plan);
+    savePlanToStorage(plan);
   }, [plan]);
 
   // Load current session + watch for changes
@@ -394,7 +188,6 @@ const App: React.FC = () => {
           // Otherwise go to home
           return "home";
         });
-        setProjects([]);
         setStartModalOpen(false);
       }
       // Mark auth as initialized after first check
@@ -447,7 +240,6 @@ const App: React.FC = () => {
           // (to avoid redirecting during initial load)
           if (event === "SIGNED_OUT" && authInitializedRef.current) {
             setAppView("home");
-            setProjects([]);
             setStartModalOpen(false);
           }
         }
@@ -461,40 +253,7 @@ const App: React.FC = () => {
     };
   }, []); // Empty deps - authInitializedRef.current doesn't need to be in deps
 
-  // Update selectedDate at midnight and on mount
-  useEffect(() => {
-    const updateDateIfNeeded = () => {
-      const today = todayISO();
-      if (selectedDate !== today) {
-        setSelectedDate(today);
-      }
-    };
-
-    // Update immediately on mount
-    updateDateIfNeeded();
-
-    // Calculate time until next midnight
-    const now = new Date();
-    const midnight = new Date(now);
-    midnight.setHours(24, 0, 0, 0);
-    const msUntilMidnight = midnight.getTime() - now.getTime();
-
-    // Set timeout for midnight
-    const midnightTimeout = setTimeout(() => {
-      updateDateIfNeeded();
-      // Then set up interval to check every minute (in case user's clock is slightly off)
-      const interval = setInterval(updateDateIfNeeded, 60000);
-      return () => clearInterval(interval);
-    }, msUntilMidnight);
-
-    // Also check periodically (every 5 minutes) in case the timeout was missed
-    const periodicCheck = setInterval(updateDateIfNeeded, 5 * 60 * 1000);
-
-    return () => {
-      clearTimeout(midnightTimeout);
-      clearInterval(periodicCheck);
-    };
-  }, [selectedDate]);
+  // Date sync is handled by useDateSync hook
 
   // REMOVED: This effect was causing redirects and state conflicts
   // Projects are now loaded via loadProjectsForUser in the auth effect
@@ -525,13 +284,10 @@ const App: React.FC = () => {
           console.error("[autosave] Error saving to cloud:", error);
         } else {
           // Keep dashboard list up to date (goal comes from state)
-          setProjects((prev) =>
-            prev.map((p) =>
-              p.id === currentProjectId
-                ? { ...p, goal: stateSnapshot.goal || null, updated_at: now }
-                : p
-            )
-          );
+          updateProjectInList(currentProjectId, {
+            goal: stateSnapshot.goal || null,
+            updated_at: now,
+          });
         }
       } catch (e) {
         console.error("[autosave] Exception saving to cloud:", e);
@@ -630,14 +386,6 @@ const App: React.FC = () => {
     setStartModalOpen(false);
   };
 
-  type AiHelperResponse = {
-    goal: string;
-    pillars: string[]; // 8 items
-    tasks: string[][]; // 8 x 8
-    name?: string;
-    description?: string;
-  };
-
   const handleAiGenerate = async () => {
     const trimmedGoal = aiGoalText.trim();
     if (!trimmedGoal) {
@@ -648,43 +396,15 @@ const App: React.FC = () => {
     setIsAiGenerating(true);
 
     try {
-      // 1) Call your backend AI helper
-      const response = await fetch(AI_HELPER_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ goal: trimmedGoal }),
-      });
+      const aiResponse = await generateAiMap(trimmedGoal);
+      const { newState } = applyAiResponseToState(state, aiResponse, trimmedGoal);
 
-      if (!response.ok) {
-        console.error("AI helper error:", response.status, await response.text());
-        // you can swap this for a nicer toast UI later
-        alert("Sorry, something went wrong generating your plan.");
-        setIsAiGenerating(false);
-        return;
-      }
-
-      const data = (await response.json()) as AiHelperResponse;
-
-      // 2) Turn the response into a Template
-      const template: Template = {
-        id: `ai-${Date.now()}`,
-        name: data.name ?? "AI-generated map",
-        description:
-          data.description ??
-          `Generated automatically from your goal: ${trimmedGoal}`,
-        goal: data.goal ?? trimmedGoal,
-        pillars: data.pillars,
-        tasks: data.tasks,
-      };
-
-      // 3) Apply it to the current grid (same as picking a template)
-      setState((prev) => withAppliedTemplate(prev, template));
+      // Apply it to the current grid (same as picking a template)
+      setState(newState);
       setActivePillar(0);
       setViewMode("grid");
       
-      // 4) Close the modal on success
+      // Close the modal on success
       setAiModalOpen(false);
       setAiGoalText("");
     } catch (error) {
@@ -693,10 +413,6 @@ const App: React.FC = () => {
     } finally {
       setIsAiGenerating(false);
     }
-  };
-
-  type PillarRefineResponse = {
-    suggestions: string[];
   };
 
   const handlePillarRefine = async (pillarIndex: number) => {
@@ -708,30 +424,16 @@ const App: React.FC = () => {
     setIsPillarRefining(true);
 
     try {
-      const response = await fetch(PILLAR_REFINE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          goal: state.goal || "",
-          currentPillar: state.pillars[pillarIndex] || "",
-        }),
-      });
-
-      if (!response.ok) {
-        console.error("Pillar refine error:", response.status, await response.text());
-        alert("Sorry, something went wrong generating pillar suggestions.");
-        setIsPillarRefining(false);
-        setPillarRefineModalOpen(false);
-        return;
-      }
-
-      const data = (await response.json()) as PillarRefineResponse;
+      const data = await refinePillar(
+        state.goal || "",
+        state.pillars[pillarIndex] || ""
+      );
       setPillarRefineSuggestions(data.suggestions || []);
     } catch (error) {
       console.error("Pillar refine request failed", error);
       alert("Sorry, something went wrong generating pillar suggestions.");
+      setIsPillarRefining(false);
+      setPillarRefineModalOpen(false);
     } finally {
       setIsPillarRefining(false);
     }

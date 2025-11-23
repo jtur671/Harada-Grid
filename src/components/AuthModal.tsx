@@ -9,17 +9,61 @@ type AuthModalProps = {
   onSwitchView: (view: "login" | "signup") => void;
 };
 
+type PasswordRequirements = {
+  minLength: boolean;
+  hasUppercase: boolean;
+  hasLowercase: boolean;
+  hasNumber: boolean;
+  hasSpecial: boolean;
+};
+
+const validatePassword = (password: string): PasswordRequirements => {
+  return {
+    minLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+  };
+};
+
+const isPasswordValid = (requirements: PasswordRequirements): boolean => {
+  return (
+    requirements.minLength &&
+    requirements.hasUppercase &&
+    requirements.hasLowercase &&
+    requirements.hasNumber &&
+    requirements.hasSpecial
+  );
+};
+
 export const AuthModal: React.FC<AuthModalProps> = ({
   authView,
   onClose,
   onSwitchView,
 }) => {
   const [authError, setAuthError] = useState<string | null>(null);
+  const [password, setPassword] = useState<string>("");
+  const [passwordRequirements, setPasswordRequirements] = useState<PasswordRequirements>({
+    minLength: false,
+    hasUppercase: false,
+    hasLowercase: false,
+    hasNumber: false,
+    hasSpecial: false,
+  });
 
   if (!authView) return null;
 
   const handleClose = () => {
     setAuthError(null);
+    setPassword("");
+    setPasswordRequirements({
+      minLength: false,
+      hasUppercase: false,
+      hasLowercase: false,
+      hasNumber: false,
+      hasSpecial: false,
+    });
     onClose();
   };
 
@@ -155,6 +199,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 className="auth-switch"
                 onClick={() => {
                   setAuthError(null);
+                  setPassword("");
+                  setPasswordRequirements({
+                    minLength: false,
+                    hasUppercase: false,
+                    hasLowercase: false,
+                    hasNumber: false,
+                    hasSpecial: false,
+                  });
                   onSwitchView("signup");
                 }}
               >
@@ -200,19 +252,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 const formData = new FormData(e.currentTarget);
                 const email = (formData.get("email") as string)?.trim();
-                const password = (formData.get("password") as string)?.trim();
+                const passwordValue = (formData.get("password") as string)?.trim();
                 const confirm = (formData.get("confirm") as string)?.trim();
 
-                if (!email || !password || password !== confirm) {
-                  if (password !== confirm) {
-                    setAuthError("Passwords do not match.");
-                  }
+                if (!email || !passwordValue) {
+                  setAuthError("Please fill in all fields.");
+                  return;
+                }
+
+                // Validate password complexity
+                const requirements = validatePassword(passwordValue);
+                if (!isPasswordValid(requirements)) {
+                  setAuthError("Password does not meet complexity requirements.");
+                  return;
+                }
+
+                if (passwordValue !== confirm) {
+                  setAuthError("Passwords do not match.");
                   return;
                 }
 
                 const { error } = await supabase.auth.signUp({
                   email,
-                  password,
+                  password: passwordValue,
                   options: {
                     emailRedirectTo: window.location.origin,
                   },
@@ -246,8 +308,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="password"
                   required
                   autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => {
+                    const newPassword = e.target.value;
+                    setPassword(newPassword);
+                    setPasswordRequirements(validatePassword(newPassword));
+                  }}
                   aria-describedby={authError ? errorId : undefined}
                 />
+                {password && (
+                  <div className="password-requirements" role="list">
+                    <div className={`password-requirement ${passwordRequirements.minLength ? "met" : "unmet"}`} role="listitem">
+                      <span className="requirement-icon">
+                        {passwordRequirements.minLength ? "✓" : "✗"}
+                      </span>
+                      <span>At least 8 characters</span>
+                    </div>
+                    <div className={`password-requirement ${passwordRequirements.hasUppercase ? "met" : "unmet"}`} role="listitem">
+                      <span className="requirement-icon">
+                        {passwordRequirements.hasUppercase ? "✓" : "✗"}
+                      </span>
+                      <span>One uppercase letter</span>
+                    </div>
+                    <div className={`password-requirement ${passwordRequirements.hasLowercase ? "met" : "unmet"}`} role="listitem">
+                      <span className="requirement-icon">
+                        {passwordRequirements.hasLowercase ? "✓" : "✗"}
+                      </span>
+                      <span>One lowercase letter</span>
+                    </div>
+                    <div className={`password-requirement ${passwordRequirements.hasNumber ? "met" : "unmet"}`} role="listitem">
+                      <span className="requirement-icon">
+                        {passwordRequirements.hasNumber ? "✓" : "✗"}
+                      </span>
+                      <span>One number</span>
+                    </div>
+                    <div className={`password-requirement ${passwordRequirements.hasSpecial ? "met" : "unmet"}`} role="listitem">
+                      <span className="requirement-icon">
+                        {passwordRequirements.hasSpecial ? "✓" : "✗"}
+                      </span>
+                      <span>One special character (!@#$%^&*...)</span>
+                    </div>
+                  </div>
+                )}
               </label>
 
               <label htmlFor="signup-confirm" className="auth-field">
@@ -271,6 +373,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 className="auth-switch"
                 onClick={() => {
                   setAuthError(null);
+                  setPassword("");
+                  setPasswordRequirements({
+                    minLength: false,
+                    hasUppercase: false,
+                    hasLowercase: false,
+                    hasNumber: false,
+                    hasSpecial: false,
+                  });
                   onSwitchView("login");
                 }}
               >

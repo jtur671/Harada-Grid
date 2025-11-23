@@ -7,6 +7,18 @@ export type HaradaState = {
   completedDates: string[]; // dates where full grid was completed
 };
 
+export type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support";
+export type AuthView = "login" | "signup" | null;
+export type SubscriptionPlan = "free" | "premium" | null;
+export type ExampleId = "career" | "sidebiz" | "wellbeing";
+
+export type ProjectSummary = {
+  id: string;
+  title: string | null;
+  goal: string | null;
+  updated_at: string;
+};
+
 export type CellKind =
   | { type: "goal" }
   | { type: "pillar"; pillarIndex: number }
