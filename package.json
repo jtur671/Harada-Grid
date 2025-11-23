@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "wrangler pages dev dist --compatibility-date=2024-01-01",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest",
@@ -32,6 +33,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.3",
     "vite": "^7.2.2",
-    "vitest": "^4.0.12"
+    "vitest": "^4.0.12",
+    "wrangler": "^4.50.0"
   }
 }
