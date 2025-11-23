@@ -27,8 +27,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setAuthError(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      // optional: redirect back to app root
-      // options: { redirectTo: window.location.origin },
+      options: {
+        redirectTo: window.location.origin,
+      },
     });
     if (error) {
       setAuthError(error.message);
@@ -202,6 +203,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 const { error } = await supabase.auth.signUp({
                   email,
                   password,
+                  options: {
+                    emailRedirectTo: window.location.origin,
+                  },
                 });
 
                 if (error) {
