@@ -22,6 +22,10 @@ export const MiniDashboard: React.FC<MiniDashboardProps> = ({
 }) => {
   const [isOpen, setIsOpen] = React.useState(true);
 
+  const currentProject = currentProjectId
+    ? projects.find((p) => p.id === currentProjectId)
+    : null;
+
   return (
     <aside
       className={`mini-dashboard ${isOpen ? "mini-dashboard-open" : "mini-dashboard-collapsed"}`}
@@ -35,7 +39,7 @@ export const MiniDashboard: React.FC<MiniDashboardProps> = ({
         {isOpen ? "‹" : "›"}
       </button>
 
-      {isOpen && (
+      {isOpen ? (
         <div className="mini-dashboard-body">
           <div className="mini-dashboard-header">
             <div>
@@ -97,6 +101,45 @@ export const MiniDashboard: React.FC<MiniDashboardProps> = ({
               ))
             )}
           </div>
+        </div>
+      ) : (
+        <div className="mini-dashboard-collapsed-content">
+          {currentProjectId && currentProject ? (
+            <button
+              type="button"
+              className="mini-dashboard-icon"
+              onClick={() => setIsOpen(true)}
+              title={currentProject.title || "Action Map"}
+            >
+              <div className="mini-dashboard-icon-text">
+                {(() => {
+                  const title = currentProject.title || "Action Map";
+                  const words = title.split(" ");
+                  const letters = words.map((word) => word[0]).join("").toUpperCase();
+                  // Extract trailing number if present
+                  const match = title.match(/(\d+)$/);
+                  const number = match ? match[1] : "";
+                  // Take first 2 letters + number, or first 3 characters
+                  return number ? letters.slice(0, 2) + number : letters.slice(0, 3);
+                })()}
+              </div>
+            </button>
+          ) : (
+            <div className="mini-dashboard-icon-placeholder" />
+          )}
+          {onNewMap && (
+            <button
+              type="button"
+              className="mini-dashboard-new-collapsed"
+              onClick={(e) => {
+                e.stopPropagation();
+                onNewMap();
+              }}
+              title="New map"
+            >
+              +
+            </button>
+          )}
         </div>
       )}
     </aside>

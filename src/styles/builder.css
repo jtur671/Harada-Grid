@@ -14,6 +14,12 @@
   color: #111827;
 }
 
+/* Override body purple background on builder page */
+body:has(.builder-app) {
+  background: #f3f4f6 !important;
+  color: #111827;
+}
+
 .builder-shell {
   min-height: 100vh;
   max-width: 1200px;
@@ -47,6 +53,11 @@
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 16px;
   align-items: flex-start;
+  transition: grid-template-columns 0.3s ease;
+}
+
+.builder-layout:has(.mini-dashboard-collapsed) {
+  grid-template-columns: 60px minmax(0, 1fr);
 }
 
 .builder-content {

@@ -19,6 +19,12 @@ import { PricingPage } from "./components/PricingPage";
 import { supabase } from "./supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
+// For local dev, use relative path (Vite proxy will forward to wrangler)
+// For production, defaults to /api/ai-helper (same domain)
+// Can override with VITE_AI_HELPER_URL env var
+const AI_HELPER_URL =
+  (import.meta.env.VITE_AI_HELPER_URL as string | undefined) ?? "/api/ai-helper";
+
 type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing";
 type AuthView = "login" | "signup" | null;
 
@@ -325,8 +331,18 @@ const App: React.FC = () => {
       const current = data.session?.user ?? null;
       setUser(current);
       if (current) {
-        // Decide whether to show builder+modal or dashboard
-        loadProjectsForUser(current);
+        // On initial load, check current view and preserve it if not home
+        // This prevents redirecting users who are already in builder/dashboard
+        setAppView((currentView) => {
+          // If already in builder or dashboard, just load projects without changing view
+          if (currentView === "builder" || currentView === "dashboard") {
+            loadProjectsForUser(current, true);
+            return currentView;
+          }
+          // If on home, load projects and let it decide where to go
+          loadProjectsForUser(current, false);
+          return currentView; // loadProjectsForUser will set view
+        });
       } else {
         setAppView("home");
         setProjects([]);
@@ -338,24 +354,41 @@ const App: React.FC = () => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null;
-      const prevUser = user;
-      setUser(u);
       
-      // Check if user actually changed (not just token refresh)
-      const userChanged = (prevUser?.id !== u?.id);
-      
-      if (u) {
-        // Preserve current view if user didn't actually change and we're in builder
-        const preserveView = !userChanged && appView === "builder";
-        loadProjectsForUser(u, preserveView);
-      } else {
-        // Only go to home on actual logout
-        if (event === "SIGNED_OUT") {
-          setAppView("home");
-          setProjects([]);
-          setStartModalOpen(false);
+      // Use functional updates to avoid stale closure issues
+      setUser((prevUser) => {
+        // Check if user actually changed (not just token refresh)
+        const userChanged = (prevUser?.id !== u?.id);
+        
+        if (u) {
+          // Only redirect on actual sign in, never on token refresh
+          setAppView((currentView) => {
+            // Always preserve view on token refresh or if already in builder/dashboard
+            if (event === "TOKEN_REFRESHED" || currentView === "builder" || currentView === "dashboard") {
+              // Just refresh projects list, don't change view
+              loadProjectsForUser(u, true);
+              return currentView;
+            } else if (event === "SIGNED_IN" || (userChanged && currentView === "home")) {
+              // Only load projects and potentially redirect on actual sign in
+              loadProjectsForUser(u, false);
+              return currentView; // loadProjectsForUser will set the view
+            } else {
+              // For other events, preserve view
+              loadProjectsForUser(u, true);
+              return currentView;
+            }
+          });
+        } else {
+          // Only go to home on actual logout
+          if (event === "SIGNED_OUT") {
+            setAppView("home");
+            setProjects([]);
+            setStartModalOpen(false);
+          }
         }
-      }
+        
+        return u;
+      });
     });
 
     return () => {
@@ -525,10 +558,64 @@ const App: React.FC = () => {
     setStartModalOpen(false);
   };
 
-  // AI stub (wire to OpenAI later)
-  const handleAiGenerate = () => {
-    console.log("AI Helper main goal:", aiGoalText);
+  type AiHelperResponse = {
+    goal: string;
+    pillars: string[]; // 8 items
+    tasks: string[][]; // 8 x 8
+    name?: string;
+    description?: string;
+  };
+
+  const handleAiGenerate = async () => {
+    const trimmedGoal = aiGoalText.trim();
+    if (!trimmedGoal) {
+      setAiModalOpen(false);
+      return;
+    }
+
+    try {
+      // 1) Call your backend AI helper
+      const response = await fetch(AI_HELPER_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ goal: trimmedGoal }),
+      });
+
+      if (!response.ok) {
+        console.error("AI helper error:", response.status, await response.text());
+        // you can swap this for a nicer toast UI later
+        alert("Sorry, something went wrong generating your plan.");
+        return;
+      }
+
+      const data = (await response.json()) as AiHelperResponse;
+
+      // 2) Turn the response into a Template
+      const template: Template = {
+        id: `ai-${Date.now()}`,
+        name: data.name ?? "AI-generated map",
+        description:
+          data.description ??
+          `Generated automatically from your goal: ${trimmedGoal}`,
+        goal: data.goal ?? trimmedGoal,
+        pillars: data.pillars,
+        tasks: data.tasks,
+      };
+
+      // 3) Apply it to the current grid (same as picking a template)
+      setState((prev) => withAppliedTemplate(prev, template));
+      setActivePillar(0);
+      setViewMode("grid");
+    } catch (error) {
+      console.error("AI helper request failed", error);
+      alert("Sorry, something went wrong generating your plan.");
+    } finally {
+      // 4) Close the modal either way
     setAiModalOpen(false);
+      setAiGoalText("");
+    }
   };
 
   const handleSelectPlan = (nextPlan: "free" | "premium") => {
