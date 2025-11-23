@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../supabaseClient";
 import type { HaradaState, ProjectSummary, AppView, SubscriptionPlan } from "../types";
@@ -26,7 +26,7 @@ export const useProjects = ({
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
 
-  const loadProjects = async (preserveView = false) => {
+  const loadProjects = useCallback(async (preserveView = false) => {
     if (!user) return;
 
     const { data, error } = await supabase
@@ -79,7 +79,7 @@ export const useProjects = ({
         if (onStartModalChange) onStartModalChange(false);
       }
     }
-  };
+  }, [user, plan, onViewChange, onViewModeChange, onStartModalChange]);
 
   const createProject = async (
     state: HaradaState,

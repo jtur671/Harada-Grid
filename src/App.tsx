@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { TEMPLATES, type Template } from "./templates";
 import type { HaradaState, AppView, AuthView, SubscriptionPlan, ExampleId } from "./types";
 import { loadState, saveState, createEmptyState } from "./utils/harada";
@@ -129,9 +129,9 @@ const App: React.FC = () => {
     }
   };
 
-  const loadProjectsForUser = async (_u: User, preserveView = false) => {
+  const loadProjectsForUser = useCallback(async (_u: User, preserveView = false) => {
     await loadProjects(preserveView);
-  };
+  }, [loadProjects]);
 
   const openProject = async (projectId: string) => {
     const projectState = await openProjectFromHook(projectId);
@@ -251,7 +251,7 @@ const App: React.FC = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, []); // Empty deps - authInitializedRef.current doesn't need to be in deps
+  }, [loadProjectsForUser]); // Include loadProjectsForUser in deps
 
   // Date sync is handled by useDateSync hook
 

@@ -194,7 +194,7 @@
   line-height: 1.6;
   font-weight: 400;
   padding-left: 20px;
-  padding-right: 12px; /* Prevent overlap with delete button */
+  padding-right: 70px; /* Prevent overlap with delete button */
   position: relative;
   word-break: break-word;
   overflow-wrap: break-word;
