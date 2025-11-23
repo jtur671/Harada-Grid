@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { TEMPLATES, type Template } from "./templates";
 import type { HaradaState } from "./types";
 import { todayISO } from "./utils/date";
@@ -152,6 +152,9 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [authView, setAuthView] = useState<AuthView>(null);
   const [plan, setPlan] = useState<SubscriptionPlan>(getInitialPlan());
+  // Track if we've completed initial auth check - after this, NEVER auto-redirect
+  // Use ref to avoid stale closure issues
+  const authInitializedRef = useRef<boolean>(false);
 
   const handleProjectTitleUpdated = (id: string, newTitle: string) => {
     setProjects((prev) =>
@@ -378,8 +381,13 @@ const App: React.FC = () => {
         });
       } else {
         // Only set to home if not logged in AND not already in a logged-out view
+        // BUT only on initial load - after that, preserve view
         setAppView((currentView) => {
-          // If already on home or pricing, stay there
+          if (authInitializedRef.current) {
+            // Already initialized - preserve view even if logged out
+            return currentView;
+          }
+          // Initial load - only set to home if not already in a logged-out view
           if (currentView === "home" || currentView === "pricing" || currentView === "support") {
             return currentView;
           }
@@ -389,6 +397,8 @@ const App: React.FC = () => {
         setProjects([]);
         setStartModalOpen(false);
       }
+      // Mark auth as initialized after first check
+      authInitializedRef.current = true;
     });
 
     const {
@@ -402,15 +412,21 @@ const App: React.FC = () => {
         const userChanged = (prevUser?.id !== u?.id);
         
         if (u) {
-          // STRICT: Only change view on actual SIGNED_IN event, never on token refresh or window focus
+          // ULTRA STRICT: After initial load, NEVER change view automatically
           setAppView((currentView) => {
-            // Preserve view for all events except SIGNED_IN
+            // If auth is already initialized, NEVER change view - just refresh projects
+            if (authInitializedRef.current) {
+              loadProjectsForUser(u, true);
+              return currentView;
+            }
+            
+            // Only on initial sign-in (before authInitialized is true)
             if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
               // Token refresh or user update - just refresh projects, never change view
               loadProjectsForUser(u, true);
               return currentView;
             } else if (event === "SIGNED_IN" && userChanged) {
-              // Only on actual sign in with user change
+              // Only on actual sign in with user change (and only before initialization)
               if (currentView === "home") {
                 // Only redirect from home, preserve all other views
                 loadProjectsForUser(u, false);
@@ -427,8 +443,9 @@ const App: React.FC = () => {
             }
           });
         } else {
-          // Only go to home on actual logout
-          if (event === "SIGNED_OUT") {
+          // Only go to home on actual logout, and only if auth is initialized
+          // (to avoid redirecting during initial load)
+          if (event === "SIGNED_OUT" && authInitializedRef.current) {
             setAppView("home");
             setProjects([]);
             setStartModalOpen(false);
@@ -442,7 +459,7 @@ const App: React.FC = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, []); // Empty deps - authInitializedRef.current doesn't need to be in deps
 
   // Update selectedDate at midnight and on mount
   useEffect(() => {
@@ -479,38 +496,9 @@ const App: React.FC = () => {
     };
   }, [selectedDate]);
 
-  // When a user logs in, try to load their saved grid
-  useEffect(() => {
-    const loadFromCloud = async () => {
-      if (!user) return;
-
-      try {
-        const { data, error } = await supabase
-          .from("action_maps")
-          .select("id,title,state")
-          .eq("user_id", user.id)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (!error && data) {
-          if (data.state) {
-          setState(data.state as HaradaState);
-          }
-          if (data.id) {
-            setCurrentProjectId(data.id);
-          }
-          if (data.title) {
-            setMapTitle(data.title);
-          }
-        }
-      } catch (error) {
-        console.error("Error loading from cloud:", error);
-      }
-    };
-
-    loadFromCloud();
-  }, [user]);
+  // REMOVED: This effect was causing redirects and state conflicts
+  // Projects are now loaded via loadProjectsForUser in the auth effect
+  // Loading the first project's state here was interfering with the current state
 
   // Auto-save grid to Supabase for logged-in users & current project
   useEffect(() => {
