@@ -594,28 +594,24 @@ const App: React.FC = () => {
             // Debounce project loading to avoid rapid calls
             authHandlerTimeoutRef.current = window.setTimeout(() => {
               authHandlerTimeoutRef.current = null;
-              // If coming back from OAuth, always redirect (even if auth is initialized)
-              // This handles the case where user completes Stripe checkout
+              // If coming back from OAuth (Stripe checkout), go to success page
+              // The success page will handle redirecting to dashboard after session is confirmed
               if (isOAuthCallback) {
-                // Clear the hash to clean up the URL immediately
-                window.history.replaceState(null, "", window.location.pathname + window.location.search);
+                console.log("[OAuth] Detected OAuth callback from Stripe, going to success page");
+                // Don't clear hash yet - success page needs OAuth tokens
+                // Just set view to success - it will handle the rest
+                setAppView("success");
                 
-                // Force redirect immediately - don't wait, don't preserve pricing page
-                // The subscription check will happen in the background
-                console.log("[OAuth] Detected OAuth callback, forcing redirect to dashboard");
-                setAppView("dashboard"); // Force redirect immediately
-                
-                // Then refresh subscription status and load projects in background
+                // Refresh subscription status and load projects in background
                 setTimeout(() => {
                   getSubscriptionStatus(u.id).then((status) => {
                     if (status) {
                       console.log("[OAuth] Subscription status after callback:", status.plan);
                       setSubscriptionStatus(status.plan);
                     }
-                    // Load projects to refresh the list
-                    loadProjectsForUser(u, true); // Preserve view since we already redirected
+                    loadProjectsForUser(u, true);
                   });
-                }, 2000); // Give webhook 2 seconds to process
+                }, 2000);
                 return;
               }
               
