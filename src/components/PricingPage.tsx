@@ -126,8 +126,10 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                 type="button"
                 className="hero-primary-cta hero-primary-cta-large"
                 onClick={() => {
-                  // Redirect to Stripe checkout
-                  // After successful payment, Stripe webhook will update subscription in database
+                  // Redirect to Stripe Payment Link
+                  // IMPORTANT: Configure the success URL in Stripe Dashboard:
+                  // https://dashboard.stripe.com → Products → Payment Links → Edit
+                  // Set success URL to: https://harada-grid.pages.dev/#success?session_id={CHECKOUT_SESSION_ID}
                   window.location.href = "https://buy.stripe.com/6oU00ieslccXaam3vieME00";
                 }}
               >

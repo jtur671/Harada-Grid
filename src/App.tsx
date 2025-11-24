@@ -24,6 +24,7 @@ import { HomePage } from "./components/HomePage";
 import { BuilderPage } from "./components/BuilderPage";
 import { PricingPage } from "./components/PricingPage";
 import { SupportPage } from "./components/SupportPage";
+import { SuccessPage } from "./components/SuccessPage";
 import { supabase } from "./supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
@@ -402,9 +403,33 @@ const App: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     
-    // Check if we're coming back from OAuth (has tokens in URL hash)
+    // Check if we're coming back from Stripe checkout success
+    const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const hasOAuthTokens = hashParams.has("access_token") || hashParams.has("error");
+    const sessionId = urlParams.get("session_id") || hashParams.get("session_id");
+    const redirectStatus = urlParams.get("redirect_status") || hashParams.get("redirect_status");
+    const isStripeSuccess = sessionId || (redirectStatus && redirectStatus === "succeeded");
+    const isSuccessHash = window.location.hash.startsWith("#success");
+    
+    // Check if we're coming back from OAuth (has tokens in URL hash, but not success)
+    const hasOAuthTokens = !isSuccessHash && (hashParams.has("access_token") || hashParams.has("error"));
+    
+    // If Stripe success, redirect to success page
+    if (isStripeSuccess || isSuccessHash) {
+      // Clean up URL - remove success params from both search and hash
+      const cleanParams = new URLSearchParams(urlParams);
+      cleanParams.delete("session_id");
+      cleanParams.delete("redirect_status");
+      const newSearch = cleanParams.toString();
+      const cleanHash = hashParams.has("access_token") ? window.location.hash : ""; // Keep OAuth tokens if present
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${cleanHash}`
+      );
+      setAppView("success");
+      return;
+    }
     
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
@@ -872,6 +897,20 @@ const App: React.FC = () => {
         onSetAuthView={setAuthView}
         onGoToPricing={() => setAppView("pricing")}
         onGoToDashboard={() => setAppView("dashboard")}
+      />
+    );
+  }
+
+  if (appView === "success") {
+    return (
+      <SuccessPage
+        user={user}
+        isAdmin={isAdmin}
+        isPro={isPro}
+        authView={authView}
+        onSetAuthView={setAuthView}
+        onSetAppView={setAppView}
+        onSetUser={setUser}
       />
     );
   }
