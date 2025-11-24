@@ -208,13 +208,16 @@ const App: React.FC = () => {
       const current = data.session?.user ?? null;
       setUser(current);
       if (current) {
-        // On initial load, STRICTLY preserve current view
+        // On initial load, let loadProjects decide the view (dashboard if has projects, etc.)
         setAppView((currentView) => {
-          // Always preserve the current view, just load projects
-          // Debounce to avoid rapid calls
+          // On first load, if we're on home, let loadProjects set the appropriate view
+          // Otherwise preserve the current view (e.g., if they're on builder/dashboard)
+          const isInitialLoad = currentView === "home";
           setTimeout(() => {
             if (!cancelled) {
-              loadProjectsForUser(current, true);
+              // If on home, let loadProjects decide the view (preserveView = false)
+              // Otherwise preserve current view (preserveView = true)
+              loadProjectsForUser(current, !isInitialLoad);
             }
           }, 100);
           return currentView;
