@@ -20,7 +20,7 @@ useEffect(() => {
 }, [state]); // state changes on every keystroke
 ```
 
-### What Was Happening
+### What Was Happen
 1. User types a character → `state` changes
 2. Effect re-runs → React runs cleanup from previous effect
 3. Cleanup clears the timeout that was just set

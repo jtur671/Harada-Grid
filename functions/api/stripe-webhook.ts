@@ -45,8 +45,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   let event: Stripe.Event;
   try {
-    // Verify webhook signature
-    event = stripe.webhooks.constructEvent(
+    // Verify webhook signature (use async version for Cloudflare Workers)
+    // Cloudflare Workers use Web Crypto API which requires async operations
+    event = await stripe.webhooks.constructEventAsync(
       body,
       signature,
       env.STRIPE_WEBHOOK_SECRET

@@ -79,7 +79,7 @@ function checkURL2(request, init) {
 __name(checkURL2, "checkURL");
 var urls2;
 var init_checked_fetch = __esm({
-  "../.wrangler/tmp/bundle-rqL0zA/checked-fetch.js"() {
+  "../.wrangler/tmp/bundle-GQ3OFV/checked-fetch.js"() {
     urls2 = /* @__PURE__ */ new Set();
     __name2(checkURL2, "checkURL");
     globalThis.fetch = new Proxy(globalThis.fetch, {
@@ -9682,7 +9682,7 @@ var init_stripe_webhook = __esm({
       const body = await request.text();
       let event;
       try {
-        event = stripe.webhooks.constructEvent(
+        event = await stripe.webhooks.constructEventAsync(
           body,
           signature,
           env.STRIPE_WEBHOOK_SECRET
