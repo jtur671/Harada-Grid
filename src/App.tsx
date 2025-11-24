@@ -15,6 +15,7 @@ import { useProjects } from "./hooks/useProjects";
 import { getInitialPlan, hasDismissedStartModal, setStartModalDismissed, setPlan as savePlanToStorage } from "./utils/storage";
 import { buildExampleState } from "./utils/projects";
 import { generateAiMap, refinePillar, applyAiResponseToState } from "./services/ai";
+import { getSubscriptionStatus } from "./services/subscriptions";
 import { FREE_PLAN_MAP_LIMIT, PRO_PLAN_MAP_LIMIT } from "./config/constants";
 import { DashboardPage } from "./components/DashboardPage";
 import { HaradaInfoPage } from "./components/HaradaInfoPage";
@@ -63,12 +64,15 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [authView, setAuthView] = useState<AuthView>(null);
   const [plan, setPlan] = useState<SubscriptionPlan>(getInitialPlan());
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionPlan>(null);
   const authInitializedRef = useRef<boolean>(false);
 
   const isLoggedIn = !!user;
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
   const isAdmin = !!user && !!adminEmail && user.email === adminEmail;
-  const isPro = plan === "premium";
+  
+  // Use database subscription status if available, fallback to localStorage for development
+  const isPro = subscriptionStatus === "premium" || (subscriptionStatus === null && plan === "premium");
 
   // Use projects hook
   const {
@@ -99,20 +103,54 @@ const App: React.FC = () => {
     updateProjectTitle(id, newTitle);
   };
 
-  // Debug: Log plan status (remove in production)
+  // Load subscription status from database when user logs in
+  // Only check once per user login to avoid excessive requests
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      let cancelled = false;
+      
+      // Debounce to avoid too many requests
+      const timeoutId = setTimeout(() => {
+        getSubscriptionStatus(user.id)
+          .then((status) => {
+            if (cancelled) return;
+            if (status) {
+              setSubscriptionStatus(status.plan);
+            } else {
+              // Fallback to localStorage for development/testing or if table doesn't exist
+              setSubscriptionStatus(plan);
+            }
+          })
+          .catch(() => {
+            if (cancelled) return;
+            // Silently fallback to localStorage on error (table might not exist yet)
+            setSubscriptionStatus(plan);
+          });
+      }, 200); // Small delay to debounce
+
+      return () => {
+        cancelled = true;
+        clearTimeout(timeoutId);
+      };
+    } else {
+      setSubscriptionStatus(null);
+    }
+  }, [isLoggedIn, user?.id]); // Only depend on user.id, not plan
+
+  // Debug: Log plan status
   useEffect(() => {
     if (isLoggedIn && user) {
       console.log("[Plan Status]", {
-        plan,
+        plan: subscriptionStatus || plan,
         isPro,
         email: user.email,
         mapsCount: projects.length,
         mapLimit,
         hasReachedMapLimit,
-        note: "⚠️ Currently based on localStorage, not actual payment. In production, this should check Stripe subscription status from database.",
+        source: subscriptionStatus ? "database" : "localStorage (dev)",
       });
     }
-  }, [plan, isPro, isLoggedIn, user, projects.length, mapLimit, hasReachedMapLimit]);
+  }, [subscriptionStatus, plan, isPro, isLoggedIn, user, projects.length, mapLimit, hasReachedMapLimit]);
 
   const ensureProjectForCurrentState = async (
     initialState?: HaradaState
@@ -163,14 +201,22 @@ const App: React.FC = () => {
 
   // Load current session + watch for changes
   useEffect(() => {
+    let cancelled = false;
+    
     supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
       const current = data.session?.user ?? null;
       setUser(current);
       if (current) {
         // On initial load, STRICTLY preserve current view
         setAppView((currentView) => {
           // Always preserve the current view, just load projects
-          loadProjectsForUser(current, true);
+          // Debounce to avoid rapid calls
+          setTimeout(() => {
+            if (!cancelled) {
+              loadProjectsForUser(current, true);
+            }
+          }, 100);
           return currentView;
         });
       } else {
@@ -207,33 +253,34 @@ const App: React.FC = () => {
         if (u) {
           // ULTRA STRICT: After initial load, NEVER change view automatically
           setAppView((currentView) => {
-            // If auth is already initialized, NEVER change view - just refresh projects
-            if (authInitializedRef.current) {
-              loadProjectsForUser(u, true);
-              return currentView;
-            }
-            
-            // Only on initial sign-in (before authInitialized is true)
-            if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
-              // Token refresh or user update - just refresh projects, never change view
-              loadProjectsForUser(u, true);
-              return currentView;
-            } else if (event === "SIGNED_IN" && userChanged) {
-              // Only on actual sign in with user change (and only before initialization)
-              if (currentView === "home") {
-                // Only redirect from home, preserve all other views
-                loadProjectsForUser(u, false);
-                return currentView; // loadProjectsForUser will set the view
-              } else {
-                // Already in builder/dashboard/etc - preserve it
+            // Debounce project loading to avoid rapid calls
+            setTimeout(() => {
+              // If auth is already initialized, NEVER change view - just refresh projects
+              if (authInitializedRef.current) {
                 loadProjectsForUser(u, true);
-                return currentView;
+                return;
               }
-            } else {
-              // For any other event, preserve view completely
-              loadProjectsForUser(u, true);
-              return currentView;
-            }
+              
+              // Only on initial sign-in (before authInitialized is true)
+              if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+                // Token refresh or user update - just refresh projects, never change view
+                loadProjectsForUser(u, true);
+              } else if (event === "SIGNED_IN" && userChanged) {
+                // Only on actual sign in with user change (and only before initialization)
+                if (currentView === "home") {
+                  // Only redirect from home, preserve all other views
+                  loadProjectsForUser(u, false);
+                } else {
+                  // Already in builder/dashboard/etc - preserve it
+                  loadProjectsForUser(u, true);
+                }
+              } else {
+                // For any other event, preserve view completely
+                loadProjectsForUser(u, true);
+              }
+            }, 150); // Debounce to prevent rapid calls
+            
+            return currentView;
           });
         } else {
           // Only go to home on actual logout, and only if auth is initialized
@@ -249,6 +296,7 @@ const App: React.FC = () => {
     });
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
   }, [loadProjectsForUser]); // Include loadProjectsForUser in deps
@@ -408,8 +456,10 @@ const App: React.FC = () => {
       setAiModalOpen(false);
       setAiGoalText("");
     } catch (error) {
-      console.error("AI helper request failed", error);
-      alert("Sorry, something went wrong generating your plan.");
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate AI map. Please try again.";
+      alert(errorMessage);
+      console.error("AI generation error:", error);
     } finally {
       setIsAiGenerating(false);
     }

@@ -12,3 +12,4 @@ export const PRO_PLAN_MAP_LIMIT = Infinity; // No limit for pro users
 export const PLAN_STORAGE_KEY = "actionmaps-plan";
 export const START_MODAL_DISMISSED_KEY = "actionmaps-start-modal-dismissed";
 
+

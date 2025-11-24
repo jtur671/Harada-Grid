@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../supabaseClient";
 import type { HaradaState, ProjectSummary, AppView, SubscriptionPlan } from "../types";
@@ -25,20 +25,35 @@ export const useProjects = ({
 }: UseProjectsOptions) => {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const loadingRef = useRef<boolean>(false);
 
   const loadProjects = useCallback(async (preserveView = false) => {
     if (!user) return;
-
-    const { data, error } = await supabase
-      .from("action_maps")
-      .select("id,title,updated_at,state")
-      .eq("user_id", user.id)
-      .order("updated_at", { ascending: false });
-
-    if (error) {
-      console.error("Failed to load projects", error);
+    
+    // Prevent concurrent requests
+    if (loadingRef.current) {
+      console.log("[loadProjects] Already loading, skipping duplicate request");
       return;
     }
+    
+    loadingRef.current = true;
+
+    try {
+      const { data, error } = await supabase
+        .from("action_maps")
+        .select("id,title,updated_at,state")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false });
+
+      if (error) {
+        // Don't log network errors that might be temporary
+        if (error.message?.includes("Failed to fetch") || error.message?.includes("ERR_INSUFFICIENT_RESOURCES")) {
+          console.warn("Network error loading projects (may be temporary):", error.message);
+        } else {
+          console.error("Failed to load projects", error);
+        }
+        return;
+      }
 
     // Extract goal from state for each project
     const list = ((data ?? []).map((p) => {
@@ -52,31 +67,42 @@ export const useProjects = ({
       };
     })) as ProjectSummary[];
 
-    setProjects(list);
+      setProjects(list);
 
-    // Only reset currentProjectId if we're not preserving the view
-    if (!preserveView) {
-      setCurrentProjectId(null);
-    }
+      // Only reset currentProjectId if we're not preserving the view
+      if (!preserveView) {
+        setCurrentProjectId(null);
+      }
 
-    // Only change view if we're not preserving it
-    if (!preserveView && onViewChange) {
-      if (list.length === 0) {
-        // Brand-new user: send them to pricing first
-        if (!plan) {
-          onViewChange("pricing");
-          if (onStartModalChange) onStartModalChange(false);
+      // Only change view if we're not preserving it
+      if (!preserveView && onViewChange) {
+        if (list.length === 0) {
+          // Brand-new user: send them to pricing first
+          if (!plan) {
+            onViewChange("pricing");
+            if (onStartModalChange) onStartModalChange(false);
+          } else {
+            // If they already chose a plan on this device, go straight to builder
+            onViewChange("builder");
+            if (onViewModeChange) onViewModeChange("grid");
+            // Only show start modal if they haven't dismissed it before
+            // This would need to be passed in or checked here
+          }
         } else {
-          // If they already chose a plan on this device, go straight to builder
-          onViewChange("builder");
-          if (onViewModeChange) onViewModeChange("grid");
-          // Only show start modal if they haven't dismissed it before
-          // This would need to be passed in or checked here
+          // Returning user: land on dashboard
+          onViewChange("dashboard");
+          if (onStartModalChange) onStartModalChange(false);
         }
+      }
+    } catch (error) {
+      // Handle network errors gracefully
+      if (error instanceof Error && (
+        error.message.includes("Failed to fetch") || 
+        error.message.includes("ERR_INSUFFICIENT_RESOURCES")
+      )) {
+        console.warn("Network error loading projects (may be temporary):", error.message);
       } else {
-        // Returning user: land on dashboard
-        onViewChange("dashboard");
-        if (onStartModalChange) onStartModalChange(false);
+        console.error("Exception loading projects:", error);
       }
     }
   }, [user, plan, onViewChange, onViewModeChange, onStartModalChange]);

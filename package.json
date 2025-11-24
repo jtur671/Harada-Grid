@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:api": "wrangler pages dev dist --compatibility-date=2024-01-01",
+    "dev:api": "wrangler pages dev dist --compatibility-date=2024-01-01 --env-file .dev.vars",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest",
@@ -14,7 +14,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.83.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "stripe": "^20.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -26,3 +26,4 @@ export const setStartModalDismissed = (): void => {
   window.localStorage.setItem(START_MODAL_DISMISSED_KEY, "true");
 };
 
+

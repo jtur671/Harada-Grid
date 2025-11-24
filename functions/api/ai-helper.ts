@@ -48,8 +48,13 @@ export const onRequestPost = async (context: EventContext<Env, any, any>) => {
     // Get OpenAI API key from environment
     const apiKey = context.env.OPENAI_API_KEY;
     if (!apiKey) {
+      console.error("[ai-helper] OPENAI_API_KEY not found in environment");
+      console.error("[ai-helper] Available env keys:", Object.keys(context.env || {}));
       return new Response(
-        JSON.stringify({ error: "OpenAI API key not configured" }),
+        JSON.stringify({ 
+          error: "OpenAI API key not configured",
+          debug: "Check that .dev.vars exists and dev server was restarted"
+        }),
         {
           status: 500,
           headers: { "Content-Type": "application/json" },
