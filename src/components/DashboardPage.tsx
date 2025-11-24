@@ -25,7 +25,7 @@ type DashboardPageProps = {
   onSetState: (state: HaradaState) => void;
   onSetViewMode: (mode: "map" | "grid") => void;
   onSetStartModalOpen: (open: boolean) => void;
-  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing" | "support") => void;
+  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing" | "support" | "subscription") => void;
   onSetAuthView: (view: AuthView) => void;
   onSetCurrentProjectId: (id: string | null) => void;
   onDeleteProject: (projectId: string) => void;
@@ -99,6 +99,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
           onGoToSupport={() => onSetAppView("support")}
+          onGoToSubscription={() => onSetAppView("subscription")}
         />
 
         <main className="dashboard-main">

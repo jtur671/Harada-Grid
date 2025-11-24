@@ -15,6 +15,7 @@ type AppHeaderProps = {
   onGoToPricing?: () => void;
   onGoToDashboard?: () => void;
   onGoToSupport?: () => void;
+  onGoToSubscription?: () => void;
 };
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -28,6 +29,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onGoToPricing,
   onGoToDashboard,
   onGoToSupport,
+  onGoToSubscription,
 }) => {
   const isLoggedIn = !!user;
 
@@ -94,6 +96,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             onClick={onGoToDashboard}
           >
             My maps
+          </button>
+        )}
+
+        {/* Subscription management link, only for Pro users */}
+        {isLoggedIn && isPro && onGoToSubscription && (
+          <button
+            type="button"
+            className="home-nav-link"
+            onClick={onGoToSubscription}
+          >
+            Manage subscription
           </button>
         )}
 

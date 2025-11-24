@@ -12,7 +12,7 @@ type SuccessPageProps = {
   isPro?: boolean;
   authView: AuthView;
   onSetAuthView: (view: AuthView) => void;
-  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing" | "support" | "success") => void;
+  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing" | "support" | "success" | "subscription") => void;
   onSetUser?: (user: User | null) => void;
 };
 
@@ -35,37 +35,40 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
 
     const initializeSuccess = async () => {
       try {
-        // Step 0: Force hard reload on first visit from Stripe (only once)
-        const hardReloadKey = "stripe-success-hard-reload";
-        const hasHardReloaded = sessionStorage.getItem(hardReloadKey);
+        // Step 0: Ensure OAuth tokens are processed BEFORE doing anything else
+        // Don't do a hard reload - it will clear the session!
+        const initialHashParams = new URLSearchParams(window.location.hash.substring(1));
+        const hasOAuthTokens = initialHashParams.has("access_token");
         
-        if (!hasHardReloaded) {
-          // Mark that we're about to do a hard reload
-          sessionStorage.setItem(hardReloadKey, "true");
+        if (hasOAuthTokens) {
+          console.log("[SuccessPage] OAuth tokens detected, waiting for Supabase to process...");
+          // Wait for Supabase to process OAuth tokens
+          await new Promise((resolve) => setTimeout(resolve, 2000));
           
-          // Clear ALL relevant caches aggressively
-          console.log("[SuccessPage] Clearing all caches and forcing hard reload...");
-          
-          if (typeof window !== "undefined") {
-            // Clear projects cache
-            const projectsCacheKey = "actionmaps-projects-cache";
-            window.localStorage.removeItem(projectsCacheKey);
-            
-            // Clear last view to force fresh load
-            window.localStorage.removeItem("actionmaps-last-view");
+          // Verify session is restored
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+          if (sessionData?.session?.user) {
+            console.log("[SuccessPage] Session restored successfully:", sessionData.session.user.email);
+            // Notify parent component to update user state
+            if (onSetUser) {
+              onSetUser(sessionData.session.user);
+            }
+          } else {
+            console.warn("[SuccessPage] Session not found after OAuth:", sessionError);
+            // Try one more time after a delay
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            const { data: retrySession } = await supabase.auth.getSession();
+            if (retrySession?.session?.user && onSetUser) {
+              onSetUser(retrySession.session.user);
+            }
           }
-          
-          // Force a hard reload by using location.reload()
-          // This should clear cache and reload fresh
-          window.location.reload();
-          return; // Exit early - page will reload
         }
         
         // Step 1: Check for Stripe success parameters (in both search and hash)
         const urlParams = new URLSearchParams(window.location.search);
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const sessionId = urlParams.get("session_id") || hashParams.get("session_id");
-        const redirectStatus = urlParams.get("redirect_status") || hashParams.get("redirect_status");
+        const successHashParams = new URLSearchParams(window.location.hash.substring(1));
+        const sessionId = urlParams.get("session_id") || successHashParams.get("session_id");
+        const redirectStatus = urlParams.get("redirect_status") || successHashParams.get("redirect_status");
         
         // Clean up the reload parameter if present
         if (urlParams.has("_reload")) {
@@ -86,11 +89,11 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
           const newSearch = cleanParams.toString();
           
           // Clean hash but preserve OAuth tokens if present
-          const cleanHashParams = new URLSearchParams(hashParams);
+          const cleanHashParams = new URLSearchParams(successHashParams);
           cleanHashParams.delete("session_id");
           cleanHashParams.delete("redirect_status");
           const newHash = cleanHashParams.toString();
-          const finalHash = newHash ? `#${newHash}` : (hashParams.has("access_token") ? window.location.hash : "");
+          const finalHash = newHash ? `#${newHash}` : (successHashParams.has("access_token") ? window.location.hash : "");
           
           window.history.replaceState(
             null,
@@ -101,7 +104,7 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
 
         // Step 2: Ensure user session is active
         // Check if we have OAuth tokens in hash (Stripe redirect might include them)
-        const hasOAuthTokens = hashParams.has("access_token");
+        // hasOAuthTokens already checked above
         
         let currentUser = user;
         
@@ -242,35 +245,36 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
     };
   }, [user, onSetAppView, onSetUser]);
 
-  // Auto-redirect to dashboard immediately with hard reload
+  // Auto-redirect to dashboard - but FIRST ensure session is restored
+  // This effect runs AFTER initializeSuccess has processed OAuth tokens
   useEffect(() => {
-    // Skip the whole success page flow - just redirect to dashboard with a refresh
     const redirectKey = "stripe-success-redirect";
     const hasRedirected = sessionStorage.getItem(redirectKey);
     
     if (!hasRedirected && window.location.hash.startsWith("#success")) {
       sessionStorage.setItem(redirectKey, "true");
-      console.log("[SuccessPage] Auto-redirecting to dashboard with hard reload...");
+      console.log("[SuccessPage] Auto-redirecting to dashboard after session restoration...");
       
-      // Clear ALL caches aggressively
-      if (typeof window !== "undefined") {
-        window.localStorage.removeItem("actionmaps-projects-cache");
-        window.localStorage.removeItem("actionmaps-last-view");
-        // Clear any other relevant caches
-        Object.keys(window.localStorage).forEach(key => {
-          if (key.startsWith("actionmaps-") || key.startsWith("sb-")) {
-            window.localStorage.removeItem(key);
-          }
-        });
-      }
-      
-      // Redirect to dashboard and force a true hard reload
-      // Use location.replace to avoid history entry, then reload
-      window.location.replace("/#dashboard");
-      // Force reload immediately - this should bypass cache
-      window.location.reload();
+      // Wait a moment to ensure session is restored by initializeSuccess
+      setTimeout(() => {
+        // Clear caches (but NOT Supabase session cache)
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("actionmaps-projects-cache");
+          window.localStorage.removeItem("actionmaps-last-view");
+          // Don't clear Supabase session cache - we need it!
+        }
+        
+        // Redirect to dashboard (without hard reload to preserve session)
+        console.log("[SuccessPage] Redirecting to dashboard...");
+        onSetAppView("dashboard");
+        
+        // Clear the hash after a moment
+        setTimeout(() => {
+          window.history.replaceState(null, "", window.location.pathname);
+        }, 500);
+      }, 1000);
     }
-  }, []);
+  }, [onSetAppView]);
 
   return (
     <div className="app app-dark">
@@ -284,6 +288,7 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
           onGoToSupport={() => onSetAppView("support")}
+          onGoToSubscription={() => onSetAppView("subscription")}
         />
 
         <main className="home-main">

@@ -7,7 +7,7 @@ import { AppHeader } from "./AppHeader";
 
 type AuthView = "login" | "signup" | null;
 type ExampleId = "career" | "sidebiz" | "wellbeing";
-type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support";
+type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support" | "subscription";
 
 type HomePageProps = {
   user: User | null;
@@ -45,6 +45,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
           onGoToSupport={() => onSetAppView("support")}
+          onGoToSubscription={() => onSetAppView("subscription")}
         />
 
         <main className="home-main">

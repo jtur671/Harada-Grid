@@ -16,7 +16,7 @@ import { triggerPrintWithBodyClass } from "../utils/print";
 import { supabase } from "../supabaseClient";
 
 type AuthView = "login" | "signup" | null;
-type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support";
+type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support" | "subscription";
 
 type BuilderPageProps = {
   state: HaradaState;
@@ -261,6 +261,7 @@ export const BuilderPage: React.FC<BuilderPageProps> = ({
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
           onGoToSupport={() => onSetAppView("support")}
+          onGoToSubscription={() => onSetAppView("subscription")}
         />
 
         <main className="builder-main">

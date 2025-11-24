@@ -4,7 +4,7 @@ import { AppHeader } from "./AppHeader";
 import { AuthModal } from "./AuthModal";
 
 type AuthView = "login" | "signup" | null;
-type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support";
+type AppView = "home" | "builder" | "harada" | "dashboard" | "pricing" | "support" | "subscription";
 type Plan = "free" | "premium";
 type ModalType = "privacy" | "terms" | null;
 
@@ -46,6 +46,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
           onGoToSupport={() => onSetAppView("support")}
+          onGoToSubscription={() => onSetAppView("subscription")}
         />
 
         <main className="home-main">

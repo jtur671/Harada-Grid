@@ -13,6 +13,7 @@ type SupportPageProps = {
   onGoToHome?: () => void;
   onGoToPricing?: () => void;
   onGoToDashboard?: () => void;
+  onGoToSubscription?: () => void;
 };
 
 export const SupportPage: React.FC<SupportPageProps> = ({
@@ -23,6 +24,7 @@ export const SupportPage: React.FC<SupportPageProps> = ({
   onGoToHome,
   onGoToPricing,
   onGoToDashboard,
+  onGoToSubscription,
 }) => {
   const [activeTab, setActiveTab] = useState<SupportTab>("support");
   return (
@@ -36,6 +38,7 @@ export const SupportPage: React.FC<SupportPageProps> = ({
           onGoToHome={onGoToHome}
           onGoToPricing={onGoToPricing}
           onGoToDashboard={onGoToDashboard}
+          onGoToSubscription={onGoToSubscription}
         />
 
         <main className="support-main">

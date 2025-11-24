@@ -32,7 +32,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../.wrangler/tmp/bundle-6slzln/checked-fetch.js
+// ../.wrangler/tmp/bundle-iNaPHq/checked-fetch.js
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
     (typeof request === "string" ? new Request(request, init) : request).url
@@ -50,7 +50,7 @@ function checkURL(request, init) {
 }
 var urls;
 var init_checked_fetch = __esm({
-  "../.wrangler/tmp/bundle-6slzln/checked-fetch.js"() {
+  "../.wrangler/tmp/bundle-iNaPHq/checked-fetch.js"() {
     urls = /* @__PURE__ */ new Set();
     __name(checkURL, "checkURL");
     globalThis.fetch = new Proxy(globalThis.fetch, {
@@ -234,165 +234,6 @@ Requirements:
       }
     }, "onRequestPost");
     onRequestOptions = /* @__PURE__ */ __name(async () => {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type"
-        }
-      });
-    }, "onRequestOptions");
-  }
-});
-
-// api/pillar-refine.ts
-var onRequestPost2, onRequestOptions2;
-var init_pillar_refine = __esm({
-  "api/pillar-refine.ts"() {
-    init_functionsRoutes_0_34990220434492625();
-    init_checked_fetch();
-    onRequestPost2 = /* @__PURE__ */ __name(async (context) => {
-      try {
-        const apiKey = context.env.OPENAI_API_KEY;
-        if (!apiKey) {
-          return new Response(
-            JSON.stringify({ error: "OpenAI API key not configured" }),
-            {
-              status: 500,
-              headers: { "Content-Type": "application/json" }
-            }
-          );
-        }
-        const requestBody = await context.request.json();
-        const goal = requestBody.goal?.trim();
-        const currentPillar = requestBody.currentPillar?.trim();
-        if (!goal) {
-          return new Response(
-            JSON.stringify({ error: "Goal is required" }),
-            {
-              status: 400,
-              headers: { "Content-Type": "application/json" }
-            }
-          );
-        }
-        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content: `You are an expert in the Harada Method, a goal-setting framework that breaks down a main goal into 8 pillars.
-
-Your task is to generate 5 alternative pillar suggestions for a given main goal. Each pillar should be:
-- A distinct, meaningful category that supports the main goal
-- Concise (2-4 words typically)
-- Actionable and specific
-- Different from the current pillar (if provided)
-
-Return ONLY valid JSON in this exact format:
-{
-  "suggestions": ["Pillar suggestion 1", "Pillar suggestion 2", "Pillar suggestion 3", "Pillar suggestion 4", "Pillar suggestion 5"]
-}
-
-Requirements:
-- You must provide exactly 5 suggestions
-- Each suggestion should be a concise pillar name (2-4 words)
-- Suggestions should be diverse and cover different aspects of achieving the goal
-- If a current pillar is provided, make sure the suggestions are different from it
-- Return ONLY the JSON, no markdown, no code blocks, no explanation`
-              },
-              {
-                role: "user",
-                content: `Main goal: ${goal}${currentPillar ? `
-Current pillar: ${currentPillar}` : ""}
-
-Generate 5 alternative pillar suggestions for this goal.`
-              }
-            ],
-            temperature: 0.8,
-            response_format: { type: "json_object" }
-          })
-        });
-        if (!openaiResponse.ok) {
-          const errorText = await openaiResponse.text();
-          console.error("OpenAI API error:", openaiResponse.status, errorText);
-          return new Response(
-            JSON.stringify({ error: "Failed to generate pillar suggestions" }),
-            {
-              status: 500,
-              headers: { "Content-Type": "application/json" }
-            }
-          );
-        }
-        const openaiData = await openaiResponse.json();
-        const content = openaiData.choices?.[0]?.message?.content;
-        if (!content) {
-          return new Response(
-            JSON.stringify({ error: "No content received from AI" }),
-            {
-              status: 500,
-              headers: { "Content-Type": "application/json" }
-            }
-          );
-        }
-        let aiResult;
-        try {
-          aiResult = JSON.parse(content);
-        } catch (parseError) {
-          console.error("Failed to parse AI response:", parseError);
-          return new Response(
-            JSON.stringify({ error: "Invalid response format from AI" }),
-            {
-              status: 500,
-              headers: { "Content-Type": "application/json" }
-            }
-          );
-        }
-        if (!Array.isArray(aiResult.suggestions)) {
-          return new Response(
-            JSON.stringify({ error: "Invalid response structure from AI" }),
-            {
-              status: 500,
-              headers: { "Content-Type": "application/json" }
-            }
-          );
-        }
-        if (aiResult.suggestions.length !== 5) {
-          return new Response(
-            JSON.stringify({ error: "AI must return exactly 5 suggestions" }),
-            {
-              status: 500,
-              headers: { "Content-Type": "application/json" }
-            }
-          );
-        }
-        return new Response(JSON.stringify(aiResult), {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type"
-          }
-        });
-      } catch (error) {
-        console.error("Pillar refine error:", error);
-        return new Response(
-          JSON.stringify({ error: "Internal server error" }),
-          {
-            status: 500,
-            headers: { "Content-Type": "application/json" }
-          }
-        );
-      }
-    }, "onRequestPost");
-    onRequestOptions2 = /* @__PURE__ */ __name(async () => {
       return new Response(null, {
         status: 204,
         headers: {
@@ -9533,6 +9374,289 @@ var init_stripe_esm_worker = __esm({
   }
 });
 
+// api/cancel-subscription.ts
+var onRequestPost2;
+var init_cancel_subscription = __esm({
+  "api/cancel-subscription.ts"() {
+    init_functionsRoutes_0_34990220434492625();
+    init_checked_fetch();
+    init_stripe_esm_worker();
+    onRequestPost2 = /* @__PURE__ */ __name(async (context) => {
+      const request = context.request;
+      const env = context.env;
+      if (!env.STRIPE_SECRET_KEY) {
+        return new Response(
+          JSON.stringify({ error: "STRIPE_SECRET_KEY is not configured" }),
+          { status: 500, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+        return new Response(
+          JSON.stringify({ error: "Supabase configuration is missing" }),
+          { status: 500, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      try {
+        const body = await request.json();
+        const { userId } = body;
+        if (!userId) {
+          return new Response(
+            JSON.stringify({ error: "userId is required" }),
+            { status: 400, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        const supabaseUrl = env.SUPABASE_URL;
+        const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY;
+        const subscriptionResponse = await fetch(
+          `${supabaseUrl}/rest/v1/subscriptions?user_id=eq.${userId}&select=stripe_customer_id,stripe_subscription_id`,
+          {
+            headers: {
+              "apikey": supabaseKey,
+              "Authorization": `Bearer ${supabaseKey}`,
+              "Content-Type": "application/json"
+            }
+          }
+        );
+        if (!subscriptionResponse.ok) {
+          console.error("[cancel-subscription] Failed to fetch subscription:", await subscriptionResponse.text());
+          return new Response(
+            JSON.stringify({ error: "Failed to fetch subscription" }),
+            { status: 500, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        const subscriptions = await subscriptionResponse.json();
+        if (!subscriptions || subscriptions.length === 0) {
+          return new Response(
+            JSON.stringify({ error: "No subscription found" }),
+            { status: 404, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        const subscription = subscriptions[0];
+        const stripeCustomerId = subscription.stripe_customer_id;
+        const stripeSubscriptionId = subscription.stripe_subscription_id;
+        if (!stripeCustomerId || !stripeSubscriptionId) {
+          return new Response(
+            JSON.stringify({ error: "Stripe customer or subscription ID not found" }),
+            { status: 404, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        const stripe = new stripe_esm_worker_default(env.STRIPE_SECRET_KEY, {
+          apiVersion: "2024-12-18.acacia"
+        });
+        const canceledSubscription = await stripe.subscriptions.update(stripeSubscriptionId, {
+          cancel_at_period_end: true
+        });
+        console.log("[cancel-subscription] Stripe subscription canceled:", canceledSubscription.id);
+        const updateResponse = await fetch(
+          `${supabaseUrl}/rest/v1/subscriptions?user_id=eq.${userId}`,
+          {
+            method: "PATCH",
+            headers: {
+              "apikey": supabaseKey,
+              "Authorization": `Bearer ${supabaseKey}`,
+              "Content-Type": "application/json",
+              "Prefer": "return=representation"
+            },
+            body: JSON.stringify({
+              status: "active",
+              // Keep as active until period ends
+              plan: "premium",
+              // Keep plan until period ends
+              cancel_at_period_end: true
+            })
+          }
+        );
+        if (!updateResponse.ok) {
+          console.error("[cancel-subscription] Failed to update database:", await updateResponse.text());
+        }
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Subscription canceled successfully",
+            cancelAtPeriodEnd: canceledSubscription.cancel_at_period_end,
+            currentPeriodEnd: canceledSubscription.current_period_end
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      } catch (error) {
+        console.error("[cancel-subscription] Error:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to cancel subscription",
+            message: error.message || "Unknown error"
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
+    }, "onRequestPost");
+  }
+});
+
+// api/pillar-refine.ts
+var onRequestPost3, onRequestOptions2;
+var init_pillar_refine = __esm({
+  "api/pillar-refine.ts"() {
+    init_functionsRoutes_0_34990220434492625();
+    init_checked_fetch();
+    onRequestPost3 = /* @__PURE__ */ __name(async (context) => {
+      try {
+        const apiKey = context.env.OPENAI_API_KEY;
+        if (!apiKey) {
+          return new Response(
+            JSON.stringify({ error: "OpenAI API key not configured" }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" }
+            }
+          );
+        }
+        const requestBody = await context.request.json();
+        const goal = requestBody.goal?.trim();
+        const currentPillar = requestBody.currentPillar?.trim();
+        if (!goal) {
+          return new Response(
+            JSON.stringify({ error: "Goal is required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            }
+          );
+        }
+        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert in the Harada Method, a goal-setting framework that breaks down a main goal into 8 pillars.
+
+Your task is to generate 5 alternative pillar suggestions for a given main goal. Each pillar should be:
+- A distinct, meaningful category that supports the main goal
+- Concise (2-4 words typically)
+- Actionable and specific
+- Different from the current pillar (if provided)
+
+Return ONLY valid JSON in this exact format:
+{
+  "suggestions": ["Pillar suggestion 1", "Pillar suggestion 2", "Pillar suggestion 3", "Pillar suggestion 4", "Pillar suggestion 5"]
+}
+
+Requirements:
+- You must provide exactly 5 suggestions
+- Each suggestion should be a concise pillar name (2-4 words)
+- Suggestions should be diverse and cover different aspects of achieving the goal
+- If a current pillar is provided, make sure the suggestions are different from it
+- Return ONLY the JSON, no markdown, no code blocks, no explanation`
+              },
+              {
+                role: "user",
+                content: `Main goal: ${goal}${currentPillar ? `
+Current pillar: ${currentPillar}` : ""}
+
+Generate 5 alternative pillar suggestions for this goal.`
+              }
+            ],
+            temperature: 0.8,
+            response_format: { type: "json_object" }
+          })
+        });
+        if (!openaiResponse.ok) {
+          const errorText = await openaiResponse.text();
+          console.error("OpenAI API error:", openaiResponse.status, errorText);
+          return new Response(
+            JSON.stringify({ error: "Failed to generate pillar suggestions" }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" }
+            }
+          );
+        }
+        const openaiData = await openaiResponse.json();
+        const content = openaiData.choices?.[0]?.message?.content;
+        if (!content) {
+          return new Response(
+            JSON.stringify({ error: "No content received from AI" }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" }
+            }
+          );
+        }
+        let aiResult;
+        try {
+          aiResult = JSON.parse(content);
+        } catch (parseError) {
+          console.error("Failed to parse AI response:", parseError);
+          return new Response(
+            JSON.stringify({ error: "Invalid response format from AI" }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" }
+            }
+          );
+        }
+        if (!Array.isArray(aiResult.suggestions)) {
+          return new Response(
+            JSON.stringify({ error: "Invalid response structure from AI" }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" }
+            }
+          );
+        }
+        if (aiResult.suggestions.length !== 5) {
+          return new Response(
+            JSON.stringify({ error: "AI must return exactly 5 suggestions" }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" }
+            }
+          );
+        }
+        return new Response(JSON.stringify(aiResult), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+          }
+        });
+      } catch (error) {
+        console.error("Pillar refine error:", error);
+        return new Response(
+          JSON.stringify({ error: "Internal server error" }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
+    }, "onRequestPost");
+    onRequestOptions2 = /* @__PURE__ */ __name(async () => {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type"
+        }
+      });
+    }, "onRequestOptions");
+  }
+});
+
 // api/stripe-webhook.ts
 async function handleCheckoutCompleted(session, env, stripe) {
   console.log("[handleCheckoutCompleted] Processing checkout session:", {
@@ -9862,13 +9986,13 @@ async function upsertSubscription(data, env) {
     throw error;
   }
 }
-var onRequestPost3;
+var onRequestPost4;
 var init_stripe_webhook = __esm({
   "api/stripe-webhook.ts"() {
     init_functionsRoutes_0_34990220434492625();
     init_checked_fetch();
     init_stripe_esm_worker();
-    onRequestPost3 = /* @__PURE__ */ __name(async (context) => {
+    onRequestPost4 = /* @__PURE__ */ __name(async (context) => {
       const request = context.request;
       const env = context.env;
       if (!env.SUPABASE_URL) {
@@ -9975,6 +10099,7 @@ var init_functionsRoutes_0_34990220434492625 = __esm({
   "../.wrangler/tmp/pages-53sRBA/functionsRoutes-0.34990220434492625.mjs"() {
     init_ai_helper();
     init_ai_helper();
+    init_cancel_subscription();
     init_pillar_refine();
     init_pillar_refine();
     init_stripe_webhook();
@@ -9994,6 +10119,13 @@ var init_functionsRoutes_0_34990220434492625 = __esm({
         modules: [onRequestPost]
       },
       {
+        routePath: "/api/cancel-subscription",
+        mountPath: "/api",
+        method: "POST",
+        middlewares: [],
+        modules: [onRequestPost2]
+      },
+      {
         routePath: "/api/pillar-refine",
         mountPath: "/api",
         method: "OPTIONS",
@@ -10005,24 +10137,24 @@ var init_functionsRoutes_0_34990220434492625 = __esm({
         mountPath: "/api",
         method: "POST",
         middlewares: [],
-        modules: [onRequestPost2]
+        modules: [onRequestPost3]
       },
       {
         routePath: "/api/stripe-webhook",
         mountPath: "/api",
         method: "POST",
         middlewares: [],
-        modules: [onRequestPost3]
+        modules: [onRequestPost4]
       }
     ];
   }
 });
 
-// ../.wrangler/tmp/bundle-6slzln/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-iNaPHq/middleware-loader.entry.ts
 init_functionsRoutes_0_34990220434492625();
 init_checked_fetch();
 
-// ../.wrangler/tmp/bundle-6slzln/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-iNaPHq/middleware-insertion-facade.js
 init_functionsRoutes_0_34990220434492625();
 init_checked_fetch();
 
@@ -10523,7 +10655,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-6slzln/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-iNaPHq/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -10557,7 +10689,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-6slzln/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-iNaPHq/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

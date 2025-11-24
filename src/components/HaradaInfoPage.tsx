@@ -8,7 +8,7 @@ type HaradaInfoPageProps = {
   user: User | null;
   isAdmin: boolean;
   isPro?: boolean;
-  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing" | "support") => void;
+  onSetAppView: (view: "home" | "builder" | "harada" | "dashboard" | "pricing" | "support" | "subscription") => void;
   onSetAuthView: (view: AuthView) => void;
 };
 
@@ -30,6 +30,7 @@ export const HaradaInfoPage: React.FC<HaradaInfoPageProps> = ({
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
           onGoToSupport={() => onSetAppView("support")}
+          onGoToSubscription={() => onSetAppView("subscription")}
         />
 
         <main className="info-main">

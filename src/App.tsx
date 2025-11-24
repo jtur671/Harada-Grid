@@ -25,6 +25,7 @@ import { BuilderPage } from "./components/BuilderPage";
 import { PricingPage } from "./components/PricingPage";
 import { SupportPage } from "./components/SupportPage";
 import { SuccessPage } from "./components/SuccessPage";
+import { SubscriptionPage } from "./components/SubscriptionPage";
 import { supabase } from "./supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
@@ -972,6 +973,7 @@ const App: React.FC = () => {
         onGoToHome={() => setAppView("home")}
         onGoToPricing={() => setAppView("pricing")}
         onGoToDashboard={() => setAppView("dashboard")}
+        onGoToSubscription={() => setAppView("subscription")}
       />
     );
   }
@@ -986,6 +988,28 @@ const App: React.FC = () => {
         onSetAuthView={setAuthView}
         onSetAppView={setAppView}
         onSetUser={setUser}
+      />
+    );
+  }
+
+  if (appView === "subscription") {
+    return (
+      <SubscriptionPage
+        user={user}
+        isAdmin={isAdmin}
+        isPro={isPro}
+        onSetAuthView={setAuthView}
+        onSetAppView={setAppView}
+        onRefreshSubscription={async () => {
+          if (user) {
+            const status = await getSubscriptionStatus(user.id);
+            if (status) {
+              setSubscriptionStatus(status.plan);
+            } else {
+              setSubscriptionStatus("free");
+            }
+          }
+        }}
       />
     );
   }
