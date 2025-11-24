@@ -43,48 +43,28 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
         const hardReloadKey = "stripe-oauth-processed";
         const hasProcessedOAuth = sessionStorage.getItem(hardReloadKey);
         
-        if (hasOAuthTokens && !hasProcessedOAuth) {
-          console.log("[SuccessPage] OAuth tokens detected - forcing hard reload to process session...");
-          // Mark that we're about to process OAuth
-          sessionStorage.setItem(hardReloadKey, "true");
-          
-          // Preserve the hash with OAuth tokens for the reload
-          // This ensures Supabase can process them on the fresh page load
-          const currentHash = window.location.hash;
-          
-          // Clear caches but preserve the hash
-          if (typeof window !== "undefined") {
-            window.localStorage.removeItem("actionmaps-projects-cache");
-            window.localStorage.removeItem("actionmaps-last-view");
-            // Don't clear Supabase session cache
-          }
-          
-          // Hard reload with the OAuth hash preserved
-          // This will trigger Supabase's onAuthStateChange listener properly
-          window.location.hash = currentHash;
-          window.location.reload();
-          return; // Exit early - page will reload
-        }
-        
-        // If we've already processed OAuth (after reload), check for session
-        if (hasProcessedOAuth) {
-          console.log("[SuccessPage] OAuth already processed, checking session...");
-          // Clear the flag for next time
-          sessionStorage.removeItem(hardReloadKey);
-          
-          // Wait a moment for Supabase to process
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+        // REMOVED: Hard reload logic - it was causing the page to get stuck
+        // Instead, let Supabase process OAuth tokens normally via onAuthStateChange
+        if (hasOAuthTokens) {
+          console.log("[SuccessPage] OAuth tokens detected, waiting for Supabase to process...");
+          // Wait for Supabase to process OAuth tokens
+          await new Promise((resolve) => setTimeout(resolve, 2000));
           
           // Check for session
           const { data: sessionData } = await supabase.auth.getSession();
           if (sessionData?.session?.user) {
-            console.log("[SuccessPage] ✅ Session found after OAuth processing:", sessionData.session.user.email);
+            console.log("[SuccessPage] ✅ Session found:", sessionData.session.user.email);
             if (onSetUser) {
               onSetUser(sessionData.session.user);
             }
           } else {
-            console.warn("[SuccessPage] ⚠️ No session found after OAuth processing");
+            console.warn("[SuccessPage] ⚠️ No session found, but continuing...");
           }
+        }
+        
+        // Clean up old session storage flags
+        if (hasProcessedOAuth) {
+          sessionStorage.removeItem(hardReloadKey);
         }
         
         // Step 1: Check for Stripe success parameters (in both search and hash)
@@ -268,35 +248,32 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
     };
   }, [user, onSetAppView, onSetUser]);
 
-  // Auto-redirect to dashboard - but FIRST ensure session is restored
-  // This effect runs AFTER initializeSuccess has processed OAuth tokens
+  // Auto-redirect to dashboard after a short delay
+  // Simplified - no complex session storage checks
   useEffect(() => {
-    const redirectKey = "stripe-success-redirect";
-    const hasRedirected = sessionStorage.getItem(redirectKey);
-    
-    if (!hasRedirected && window.location.hash.startsWith("#success")) {
-      sessionStorage.setItem(redirectKey, "true");
-      console.log("[SuccessPage] Auto-redirecting to dashboard after session restoration...");
-      
-      // Wait a moment to ensure session is restored by initializeSuccess
-      setTimeout(() => {
-        // Clear caches (but NOT Supabase session cache)
-        if (typeof window !== "undefined") {
-          window.localStorage.removeItem("actionmaps-projects-cache");
-          window.localStorage.removeItem("actionmaps-last-view");
-          // Don't clear Supabase session cache - we need it!
-        }
-        
-        // Redirect to dashboard (without hard reload to preserve session)
-        console.log("[SuccessPage] Redirecting to dashboard...");
-        onSetAppView("dashboard");
-        
-        // Clear the hash after a moment
-        setTimeout(() => {
-          window.history.replaceState(null, "", window.location.pathname);
-        }, 500);
-      }, 1000);
+    if (!window.location.hash.startsWith("#success")) {
+      return;
     }
+
+    const redirectTimer = setTimeout(() => {
+      console.log("[SuccessPage] Auto-redirecting to dashboard...");
+      
+      // Clear caches
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("actionmaps-projects-cache");
+        window.localStorage.removeItem("actionmaps-last-view");
+      }
+      
+      // Redirect to dashboard
+      onSetAppView("dashboard");
+      
+      // Clear the hash
+      setTimeout(() => {
+        window.history.replaceState(null, "", window.location.pathname);
+      }, 500);
+    }, 3000); // Wait 3 seconds for session to be restored
+    
+    return () => clearTimeout(redirectTimer);
   }, [onSetAppView]);
 
   return (

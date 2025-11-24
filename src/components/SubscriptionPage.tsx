@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getSubscriptionStatus, type SubscriptionStatus } from "../services/subscriptions";
 import { AppHeader } from "./AppHeader";
@@ -28,26 +28,47 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Use ref to prevent multiple simultaneous loads
+  const loadingRef = useRef(false);
+  const loadedRef = useRef<string | null>(null); // Track which user ID we've loaded
+
   useEffect(() => {
     if (!user) {
       setIsLoading(false);
       return;
     }
 
+    // Prevent loading if already loading or already loaded for this user
+    if (loadingRef.current) {
+      console.log("[SubscriptionPage] Already loading, skipping...");
+      return;
+    }
+
+    if (loadedRef.current === user.id) {
+      console.log("[SubscriptionPage] Already loaded for this user, skipping...");
+      setIsLoading(false);
+      return;
+    }
+
     const loadSubscription = async () => {
+      loadingRef.current = true;
       try {
+        console.log("[SubscriptionPage] Loading subscription for user:", user.id);
         const status = await getSubscriptionStatus(user.id);
+        console.log("[SubscriptionPage] Subscription loaded:", status);
         setSubscription(status);
+        loadedRef.current = user.id; // Mark as loaded
       } catch (err) {
         console.error("[SubscriptionPage] Error loading subscription:", err);
         setError("Failed to load subscription information.");
       } finally {
         setIsLoading(false);
+        loadingRef.current = false;
       }
     };
 
     loadSubscription();
-  }, [user]);
+  }, [user?.id]); // Only depend on user.id, not the whole user object
 
   const handleCancelSubscription = async () => {
     if (!user || !subscription) return;
@@ -84,39 +105,24 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
 
       const result = await response.json();
       console.log("[SubscriptionPage] Subscription canceled successfully:", result);
-      console.log("[SubscriptionPage] ⚠️ CRITICAL: Checking subscription status NOW...");
 
       setSuccess("Your subscription has been cancelled. You'll retain Pro access until the end of your billing period.");
       
-      // CRITICAL: Wait a moment for database to update, then immediately refresh
-      // The cancel API updates the database, but there might be a brief delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Wait a moment for database to update
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       
-      // Immediately refresh subscription status from database
-      console.log("[SubscriptionPage] Step 1: Fetching subscription status from database...");
+      // Refresh subscription status ONCE (no infinite loops!)
+      console.log("[SubscriptionPage] Refreshing subscription status...");
       const updatedStatus = await getSubscriptionStatus(user.id);
-      console.log("[SubscriptionPage] Step 1 Result - Subscription status:", updatedStatus);
-      console.log("[SubscriptionPage] Step 1 Result - Plan:", updatedStatus?.plan);
-      console.log("[SubscriptionPage] Step 1 Result - Cancel at period end:", updatedStatus?.cancelAtPeriodEnd);
+      console.log("[SubscriptionPage] Updated status:", updatedStatus);
       setSubscription(updatedStatus);
       
-      // CRITICAL: Notify parent to refresh subscription status - this updates the UI (header, etc.)
-      console.log("[SubscriptionPage] Step 2: Calling onRefreshSubscription to update parent state...");
-      await onRefreshSubscription();
-      console.log("[SubscriptionPage] Step 2: Parent state updated");
+      // Reset loaded flag so we can reload if needed
+      loadedRef.current = null;
       
-      // Force a final re-check after a delay to ensure everything is synced
-      setTimeout(async () => {
-        console.log("[SubscriptionPage] Step 3: Final subscription status check...");
-        const finalStatus = await getSubscriptionStatus(user.id);
-        console.log("[SubscriptionPage] Step 3 Result - Final status:", finalStatus);
-        console.log("[SubscriptionPage] Step 3 Result - Final plan:", finalStatus?.plan);
-        setSubscription(finalStatus);
-        // Refresh parent one more time to ensure UI is fully updated
-        console.log("[SubscriptionPage] Step 3: Final parent refresh...");
-        await onRefreshSubscription();
-        console.log("[SubscriptionPage] ✅ All subscription status checks complete");
-      }, 2000);
+      // Notify parent to refresh subscription status (ONCE)
+      console.log("[SubscriptionPage] Updating parent state...");
+      await onRefreshSubscription();
     } catch (err) {
       console.error("[SubscriptionPage] Exception canceling subscription:", err);
       setError("An error occurred while canceling your subscription. Please try again.");
