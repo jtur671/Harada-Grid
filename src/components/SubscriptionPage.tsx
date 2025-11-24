@@ -84,21 +84,39 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
 
       const result = await response.json();
       console.log("[SubscriptionPage] Subscription canceled successfully:", result);
+      console.log("[SubscriptionPage] ⚠️ CRITICAL: Checking subscription status NOW...");
 
       setSuccess("Your subscription has been cancelled. You'll retain Pro access until the end of your billing period.");
       
-      // Refresh subscription status
+      // CRITICAL: Wait a moment for database to update, then immediately refresh
+      // The cancel API updates the database, but there might be a brief delay
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      
+      // Immediately refresh subscription status from database
+      console.log("[SubscriptionPage] Step 1: Fetching subscription status from database...");
       const updatedStatus = await getSubscriptionStatus(user.id);
+      console.log("[SubscriptionPage] Step 1 Result - Subscription status:", updatedStatus);
+      console.log("[SubscriptionPage] Step 1 Result - Plan:", updatedStatus?.plan);
+      console.log("[SubscriptionPage] Step 1 Result - Cancel at period end:", updatedStatus?.cancelAtPeriodEnd);
       setSubscription(updatedStatus);
       
-      // Notify parent to refresh subscription status
-      onRefreshSubscription();
-
-      // Reload subscription info after a moment
+      // CRITICAL: Notify parent to refresh subscription status - this updates the UI (header, etc.)
+      console.log("[SubscriptionPage] Step 2: Calling onRefreshSubscription to update parent state...");
+      await onRefreshSubscription();
+      console.log("[SubscriptionPage] Step 2: Parent state updated");
+      
+      // Force a final re-check after a delay to ensure everything is synced
       setTimeout(async () => {
-        const status = await getSubscriptionStatus(user.id);
-        setSubscription(status);
-      }, 1000);
+        console.log("[SubscriptionPage] Step 3: Final subscription status check...");
+        const finalStatus = await getSubscriptionStatus(user.id);
+        console.log("[SubscriptionPage] Step 3 Result - Final status:", finalStatus);
+        console.log("[SubscriptionPage] Step 3 Result - Final plan:", finalStatus?.plan);
+        setSubscription(finalStatus);
+        // Refresh parent one more time to ensure UI is fully updated
+        console.log("[SubscriptionPage] Step 3: Final parent refresh...");
+        await onRefreshSubscription();
+        console.log("[SubscriptionPage] ✅ All subscription status checks complete");
+      }, 2000);
     } catch (err) {
       console.error("[SubscriptionPage] Exception canceling subscription:", err);
       setError("An error occurred while canceling your subscription. Please try again.");

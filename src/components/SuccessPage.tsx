@@ -35,32 +35,55 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
 
     const initializeSuccess = async () => {
       try {
-        // Step 0: Ensure OAuth tokens are processed BEFORE doing anything else
-        // Don't do a hard reload - it will clear the session!
+        // Step 0: CRITICAL - Process OAuth tokens from Stripe redirect
+        // When Stripe redirects back, OAuth tokens are in the hash
+        // Supabase needs to process these, but sometimes a hard reload is needed
         const initialHashParams = new URLSearchParams(window.location.hash.substring(1));
         const hasOAuthTokens = initialHashParams.has("access_token");
+        const hardReloadKey = "stripe-oauth-processed";
+        const hasProcessedOAuth = sessionStorage.getItem(hardReloadKey);
         
-        if (hasOAuthTokens) {
-          console.log("[SuccessPage] OAuth tokens detected, waiting for Supabase to process...");
-          // Wait for Supabase to process OAuth tokens
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (hasOAuthTokens && !hasProcessedOAuth) {
+          console.log("[SuccessPage] OAuth tokens detected - forcing hard reload to process session...");
+          // Mark that we're about to process OAuth
+          sessionStorage.setItem(hardReloadKey, "true");
           
-          // Verify session is restored
-          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+          // Preserve the hash with OAuth tokens for the reload
+          // This ensures Supabase can process them on the fresh page load
+          const currentHash = window.location.hash;
+          
+          // Clear caches but preserve the hash
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem("actionmaps-projects-cache");
+            window.localStorage.removeItem("actionmaps-last-view");
+            // Don't clear Supabase session cache
+          }
+          
+          // Hard reload with the OAuth hash preserved
+          // This will trigger Supabase's onAuthStateChange listener properly
+          window.location.hash = currentHash;
+          window.location.reload();
+          return; // Exit early - page will reload
+        }
+        
+        // If we've already processed OAuth (after reload), check for session
+        if (hasProcessedOAuth) {
+          console.log("[SuccessPage] OAuth already processed, checking session...");
+          // Clear the flag for next time
+          sessionStorage.removeItem(hardReloadKey);
+          
+          // Wait a moment for Supabase to process
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          
+          // Check for session
+          const { data: sessionData } = await supabase.auth.getSession();
           if (sessionData?.session?.user) {
-            console.log("[SuccessPage] Session restored successfully:", sessionData.session.user.email);
-            // Notify parent component to update user state
+            console.log("[SuccessPage] ✅ Session found after OAuth processing:", sessionData.session.user.email);
             if (onSetUser) {
               onSetUser(sessionData.session.user);
             }
           } else {
-            console.warn("[SuccessPage] Session not found after OAuth:", sessionError);
-            // Try one more time after a delay
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            const { data: retrySession } = await supabase.auth.getSession();
-            if (retrySession?.session?.user && onSetUser) {
-              onSetUser(retrySession.session.user);
-            }
+            console.warn("[SuccessPage] ⚠️ No session found after OAuth processing");
           }
         }
         

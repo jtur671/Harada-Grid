@@ -1002,11 +1002,25 @@ const App: React.FC = () => {
         onSetAppView={setAppView}
         onRefreshSubscription={async () => {
           if (user) {
+            console.log("[App] Refreshing subscription status for user:", user.id);
             const status = await getSubscriptionStatus(user.id);
+            console.log("[App] Subscription status from database:", status);
             if (status) {
+              console.log("[App] Setting subscription status to:", status.plan);
               setSubscriptionStatus(status.plan);
+              // Also update localStorage plan to match
+              if (status.plan === "free") {
+                setPlan("free");
+                savePlanToStorage("free");
+              } else if (status.plan === "premium") {
+                setPlan("premium");
+                savePlanToStorage("premium");
+              }
             } else {
+              console.log("[App] No subscription status found, defaulting to free");
               setSubscriptionStatus("free");
+              setPlan("free");
+              savePlanToStorage("free");
             }
           }
         }}
