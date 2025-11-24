@@ -321,11 +321,24 @@ const App: React.FC = () => {
         const userChanged = (prevUser?.id !== u?.id);
         
         if (u) {
-          // ULTRA STRICT: After initial load, NEVER change view automatically
+          // Check if we're coming back from OAuth (e.g., Stripe checkout)
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const isOAuthCallback = hashParams.has("access_token");
+          
           setAppView((currentView) => {
             // Debounce project loading to avoid rapid calls
             setTimeout(() => {
-              // If auth is already initialized, NEVER change view - just refresh projects
+              // If coming back from OAuth, always redirect (even if auth is initialized)
+              // This handles the case where user completes Stripe checkout
+              if (isOAuthCallback) {
+                // Clear the hash to clean up the URL
+                window.history.replaceState(null, "", window.location.pathname + window.location.search);
+                // Let loadProjects decide where to go (dashboard if has subscription, etc.)
+                loadProjectsForUser(u, false);
+                return;
+              }
+              
+              // If auth is already initialized, preserve view - just refresh projects
               if (authInitializedRef.current) {
                 loadProjectsForUser(u, true);
                 return;
@@ -337,16 +350,7 @@ const App: React.FC = () => {
                 loadProjectsForUser(u, true);
               } else if (event === "SIGNED_IN" && userChanged) {
                 // Only on actual sign in with user change (and only before initialization)
-                // If coming back from OAuth (e.g., Stripe checkout), always redirect to let loadProjects decide
-                const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                const isOAuthCallback = hashParams.has("access_token");
-                
-                if (isOAuthCallback) {
-                  // Clear the hash to clean up the URL
-                  window.history.replaceState(null, "", window.location.pathname + window.location.search);
-                  // Let loadProjects decide where to go (dashboard if has subscription, etc.)
-                  loadProjectsForUser(u, false);
-                } else if (currentView === "home") {
+                if (currentView === "home") {
                   // Only redirect from home, preserve all other views
                   loadProjectsForUser(u, false);
                 } else {
