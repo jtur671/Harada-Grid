@@ -12,7 +12,7 @@ import {
 import { useProgressStats } from "./hooks/useProgressStats";
 import { useDateSync } from "./hooks/useDateSync";
 import { useProjects } from "./hooks/useProjects";
-import { getInitialPlan, hasDismissedStartModal, setStartModalDismissed, setPlan as savePlanToStorage } from "./utils/storage";
+import { getInitialPlan, hasDismissedStartModal, setStartModalDismissed, setPlan as savePlanToStorage, getLastView, setLastView } from "./utils/storage";
 import { buildExampleState } from "./utils/projects";
 import { generateAiMap, refinePillar, applyAiResponseToState } from "./services/ai";
 import { getSubscriptionStatus } from "./services/subscriptions";
@@ -60,12 +60,17 @@ const App: React.FC = () => {
     buildExampleState("career")
   );
 
-  const [appView, setAppView] = useState<AppView>("home");
+  // Initialize appView from localStorage if available, otherwise default to "home"
+  const [appView, setAppView] = useState<AppView>(() => {
+    const lastView = getLastView();
+    return lastView || "home";
+  });
   const [user, setUser] = useState<User | null>(null);
   const [authView, setAuthView] = useState<AuthView>(null);
   const [plan, setPlan] = useState<SubscriptionPlan>(getInitialPlan());
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionPlan>(null);
   const authInitializedRef = useRef<boolean>(false);
+  const lastSavedStateRef = useRef<string>("");
 
   const isLoggedIn = !!user;
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
@@ -137,18 +142,23 @@ const App: React.FC = () => {
     }
   }, [isLoggedIn, user?.id]); // Only depend on user.id, not plan
 
-  // Debug: Log plan status
+  // Debug: Log plan status (only once when it changes, not on every render)
+  const prevPlanStatusRef = useRef<string | null>(null);
   useEffect(() => {
     if (isLoggedIn && user) {
-      console.log("[Plan Status]", {
-        plan: subscriptionStatus || plan,
-        isPro,
-        email: user.email,
-        mapsCount: projects.length,
-        mapLimit,
-        hasReachedMapLimit,
-        source: subscriptionStatus ? "database" : "localStorage (dev)",
-      });
+      const currentPlanStatus = `${subscriptionStatus || plan}-${isPro}-${projects.length}`;
+      if (prevPlanStatusRef.current !== currentPlanStatus) {
+        console.log("[Plan Status]", {
+          plan: subscriptionStatus || plan,
+          isPro,
+          email: user.email,
+          mapsCount: projects.length,
+          mapLimit,
+          hasReachedMapLimit,
+          source: subscriptionStatus ? "database" : "localStorage (dev)",
+        });
+        prevPlanStatusRef.current = currentPlanStatus;
+      }
     }
   }, [subscriptionStatus, plan, isPro, isLoggedIn, user, projects.length, mapLimit, hasReachedMapLimit]);
 
@@ -199,6 +209,14 @@ const App: React.FC = () => {
     savePlanToStorage(plan);
   }, [plan]);
 
+  // Persist appView to localStorage whenever it changes (except home)
+  useEffect(() => {
+    // Don't save "home" as the last view - we want logged-in users to go to dashboard
+    if (appView !== "home") {
+      setLastView(appView);
+    }
+  }, [appView]);
+
   // Load current session + watch for changes
   useEffect(() => {
     let cancelled = false;
@@ -208,20 +226,16 @@ const App: React.FC = () => {
       const current = data.session?.user ?? null;
       setUser(current);
       if (current) {
-        // On initial load, let loadProjects decide the view (dashboard if has projects, etc.)
-        setAppView((currentView) => {
-          // On first load, if we're on home, let loadProjects set the appropriate view
-          // Otherwise preserve the current view (e.g., if they're on builder/dashboard)
-          const isInitialLoad = currentView === "home";
-          setTimeout(() => {
-            if (!cancelled) {
-              // If on home, let loadProjects decide the view (preserveView = false)
-              // Otherwise preserve current view (preserveView = true)
-              loadProjectsForUser(current, !isInitialLoad);
-            }
-          }, 100);
-          return currentView;
-        });
+        // On initial load (page refresh), always let loadProjects decide the view
+        // This ensures logged-in users go to dashboard, not home
+        setTimeout(() => {
+          if (!cancelled) {
+            // On refresh, always let loadProjects set the appropriate view
+            // (dashboard if has projects, pricing if no plan, etc.)
+            // Don't preserve view - let it decide based on user's projects
+            loadProjectsForUser(current, false);
+          }
+        }, 100);
       } else {
         // Only set to home if not logged in AND not already in a logged-out view
         // BUT only on initial load - after that, preserve view
@@ -312,13 +326,81 @@ const App: React.FC = () => {
 
   // Auto-save grid to Supabase for logged-in users & current project
   useEffect(() => {
+    // Debug: Log autosave conditions
+    const conditions = {
+      isLoggedIn,
+      hasUser: !!user,
+      currentProjectId,
+      appView,
+      isBuilder: appView === "builder",
+    };
+    
     // Don't auto-save if not in builder view or if no current project
-    if (!isLoggedIn || !user || !currentProjectId || appView !== "builder") return;
+    if (!isLoggedIn || !user || !currentProjectId || appView !== "builder") {
+      console.log("[autosave] ❌ Conditions not met:", conditions);
+      return;
+    }
+
+    // Only save if state has actual content (not just empty state)
+    const hasContent = state.goal?.trim() || 
+      state.pillars.some(p => p?.trim()) || 
+      state.tasks.some(row => row.some(t => t?.trim()));
+
+    if (!hasContent) {
+      console.log("[autosave] ⏭️ Skipping - state is empty:", {
+        goal: state.goal || "(empty)",
+        hasPillars: state.pillars.some(p => p?.trim()),
+        hasTasks: state.tasks.some(row => row.some(t => t?.trim())),
+      });
+      return;
+    }
+
+    // Create a fingerprint of the state to detect actual changes
+    const stateFingerprint = JSON.stringify({
+      goal: state.goal,
+      pillars: state.pillars,
+      tasks: state.tasks,
+    });
+
+    // Skip if state hasn't actually changed
+    if (lastSavedStateRef.current === stateFingerprint) {
+      return;
+    }
+
+    // Debug: Log what we're about to save (only when state changes)
+    console.log("[autosave] 📝 State changed, will save in 800ms:", {
+      goal: state.goal || "(empty)",
+      goalLength: state.goal?.length || 0,
+      goalPreview: state.goal?.substring(0, 50) || "(empty)",
+      hasPillars: state.pillars.some(p => p?.trim()),
+      hasTasks: state.tasks.some(row => row.some(t => t?.trim())),
+    });
 
     const timeoutId = window.setTimeout(async () => {
       try {
-        const stateSnapshot = state;
+        // Capture state at the time of save (create a deep copy to avoid stale closure)
+        const stateSnapshot = {
+          ...state,
+          goal: state.goal,
+          pillars: [...state.pillars],
+          tasks: state.tasks.map(row => [...row]),
+          diaryByDate: { ...state.diaryByDate },
+          progressByDate: { ...state.progressByDate },
+          completedDates: [...state.completedDates],
+        };
         const now = new Date().toISOString();
+
+        // Debug: Log what we're actually saving
+        console.log("[autosave] 💾 Saving to database:", {
+          projectId: currentProjectId,
+          goal: stateSnapshot.goal || "(empty)",
+          goalLength: stateSnapshot.goal?.length || 0,
+          goalPreview: stateSnapshot.goal?.substring(0, 50) || "(empty)",
+          hasPillars: stateSnapshot.pillars.length > 0,
+          pillarsCount: stateSnapshot.pillars.filter(p => p && p.trim()).length,
+          hasTasks: stateSnapshot.tasks.length > 0,
+          tasksCount: stateSnapshot.tasks.flat().filter(t => t && t.trim()).length,
+        });
 
         // Update without goal column (goal is stored in state.goal)
         const updatePayload = {
@@ -339,14 +421,23 @@ const App: React.FC = () => {
             goal: stateSnapshot.goal || null,
             updated_at: now,
           });
+          
+          // Update the fingerprint to prevent duplicate saves
+          lastSavedStateRef.current = stateFingerprint;
+          
+          console.log("[autosave] ✅ Saved successfully:", {
+            projectId: currentProjectId,
+            goal: stateSnapshot.goal?.substring(0, 50) || "(no goal)",
+            updated_at: now,
+          });
         }
       } catch (e) {
-        console.error("[autosave] Exception saving to cloud:", e);
+        console.error("[autosave] ❌ Exception saving to cloud:", e);
       }
     }, 800); // debounce
 
     return () => window.clearTimeout(timeoutId);
-  }, [user, state, isLoggedIn, currentProjectId]);
+  }, [user, state, isLoggedIn, currentProjectId, appView, updateProjectInList]);
 
   const {
     progressForDay,

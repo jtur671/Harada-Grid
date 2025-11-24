@@ -157,11 +157,27 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       .single();
 
                     if (!error && data?.state) {
-                      onSetState(data.state as HaradaState);
+                      const loadedState = data.state as HaradaState;
+                      console.log("[Dashboard] Loading project state:", {
+                        projectId: p.id,
+                        hasState: !!data.state,
+                        goal: loadedState?.goal || "(no goal)",
+                        goalLength: loadedState?.goal?.length || 0,
+                        hasPillars: loadedState?.pillars?.length > 0,
+                        pillarsWithContent: loadedState?.pillars?.filter(p => p?.trim()).length || 0,
+                        hasTasks: loadedState?.tasks?.length > 0,
+                        tasksWithContent: loadedState?.tasks?.flat().filter(t => t?.trim()).length || 0,
+                        stateType: typeof data.state,
+                        stateIsObject: data.state && typeof data.state === 'object',
+                        stateKeys: data.state ? Object.keys(data.state) : [],
+                      });
+                      onSetState(loadedState);
                       onSetViewMode("grid");
                       onSetStartModalOpen(false);
                       onSetCurrentProjectId(p.id);
                       onSetAppView("builder");
+                    } else {
+                      console.error("[Dashboard] Error loading project:", error, "data:", data);
                     }
                   }}
                   onKeyDown={(e) => {

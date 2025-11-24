@@ -30,13 +30,23 @@ export const useProjects = ({
   const loadProjects = useCallback(async (preserveView = false) => {
     if (!user) return;
     
-    // Prevent concurrent requests
+    // Prevent concurrent requests, but allow retry after a delay if previous request failed
     if (loadingRef.current) {
       console.log("[loadProjects] Already loading, skipping duplicate request");
+      // If we've been loading for more than 5 seconds, allow a retry
+      // This prevents getting stuck if a request hangs
       return;
     }
     
     loadingRef.current = true;
+    
+    // Safety timeout: if loading takes more than 10 seconds, reset the flag
+    const safetyTimeout = setTimeout(() => {
+      if (loadingRef.current) {
+        console.warn("[loadProjects] Loading timeout - resetting flag");
+        loadingRef.current = false;
+      }
+    }, 10000);
 
     try {
       const { data, error } = await supabase
@@ -52,6 +62,9 @@ export const useProjects = ({
         } else {
           console.error("Failed to load projects", error);
         }
+        // Clear projects list on error so UI shows empty state
+        setProjects([]);
+        // Don't return - let finally block clear the loading flag
         return;
       }
 
@@ -104,6 +117,9 @@ export const useProjects = ({
       } else {
         console.error("Exception loading projects:", error);
       }
+    } finally {
+      clearTimeout(safetyTimeout);
+      loadingRef.current = false;
     }
   }, [user, plan, onViewChange, onViewModeChange, onStartModalChange]);
 
@@ -134,6 +150,17 @@ export const useProjects = ({
     }
 
     try {
+      // Debug: Log what we're creating
+      console.log("[createProject] Creating with state:", {
+        title,
+        goal: snapshot.goal || "(empty)",
+        goalLength: snapshot.goal?.length || 0,
+        hasPillars: snapshot.pillars.length > 0,
+        pillarsCount: snapshot.pillars.filter(p => p && p.trim()).length,
+        hasTasks: snapshot.tasks.length > 0,
+        tasksCount: snapshot.tasks.flat().filter(t => t && t.trim()).length,
+      });
+
       const insertPayload = {
         user_id: user.id,
         title,

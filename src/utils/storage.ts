@@ -1,5 +1,5 @@
-import type { SubscriptionPlan } from "../types";
-import { PLAN_STORAGE_KEY, START_MODAL_DISMISSED_KEY } from "../config/constants";
+import type { SubscriptionPlan, AppView } from "../types";
+import { PLAN_STORAGE_KEY, START_MODAL_DISMISSED_KEY, LAST_VIEW_KEY } from "../config/constants";
 
 export const getInitialPlan = (): SubscriptionPlan => {
   if (typeof window === "undefined") return null;
@@ -24,6 +24,20 @@ export const hasDismissedStartModal = (): boolean => {
 export const setStartModalDismissed = (): void => {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(START_MODAL_DISMISSED_KEY, "true");
+};
+
+export const getLastView = (): AppView | null => {
+  if (typeof window === "undefined") return null;
+  const stored = window.localStorage.getItem(LAST_VIEW_KEY);
+  if (stored === "home" || stored === "builder" || stored === "dashboard" || stored === "pricing" || stored === "support" || stored === "harada") {
+    return stored as AppView;
+  }
+  return null;
+};
+
+export const setLastView = (view: AppView): void => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(LAST_VIEW_KEY, view);
 };
 
 

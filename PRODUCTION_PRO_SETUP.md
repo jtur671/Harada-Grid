@@ -4,7 +4,7 @@
 This guide walks you through setting up production-ready Stripe subscription management for the Pro plan.
 
 ## Current State
-- ✅ Stripe checkout URL: `https://buy.stripe.com/aFa6oHfYQgCI3eDcj8cAo00`
+- ✅ Stripe checkout URL: `https://buy.stripe.com/6oU00ieslccXaam3vieME00`
 - ⚠️ Pro status currently stored in localStorage (testing only)
 - ❌ No database tracking of subscriptions
 - ❌ No Stripe webhook integration

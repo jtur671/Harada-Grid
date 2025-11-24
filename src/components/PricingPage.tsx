@@ -128,7 +128,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                 onClick={() => {
                   // Redirect to Stripe checkout
                   // After successful payment, Stripe webhook will update subscription in database
-                  window.location.href = "https://buy.stripe.com/aFa6oHfYQgCI3eDcj8cAo00";
+                  window.location.href = "https://buy.stripe.com/6oU00ieslccXaam3vieME00";
                 }}
               >
                 {currentPlan === "premium"
