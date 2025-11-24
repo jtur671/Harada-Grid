@@ -483,9 +483,8 @@ async function upsertSubscription(
   console.log("[upsertSubscription] Payload:", JSON.stringify(payload, null, 2));
 
   try {
-    // Use POST with Prefer: resolution=merge-duplicates to handle upsert
-    // This will insert if user_id doesn't exist, or update if it does
-    const response = await fetch(
+    // Try POST first (insert)
+    let response = await fetch(
       `${env.SUPABASE_URL}/rest/v1/subscriptions`,
       {
         method: "POST",
@@ -493,41 +492,82 @@ async function upsertSubscription(
           Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
           apikey: env.SUPABASE_SERVICE_ROLE_KEY,
           "Content-Type": "application/json",
-          Prefer: "resolution=merge-duplicates",
         },
         body: JSON.stringify(payload),
       }
     );
 
     const responseText = await response.text();
-    console.log("[upsertSubscription] Response:", {
+    console.log("[upsertSubscription] POST Response:", {
       status: response.status,
       statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries()),
-      body: responseText.substring(0, 500), // First 500 chars
+      body: responseText.substring(0, 500),
     });
 
+    // If 409 (conflict) - record already exists, use PATCH to update
+    if (response.status === 409) {
+      console.log("[upsertSubscription] Record exists (409), updating with PATCH");
+      
+      // Use PATCH with user_id in the URL to update existing record
+      response = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/subscriptions?user_id=eq.${data.userId}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify({
+            stripe_customer_id: data.stripeCustomerId,
+            stripe_subscription_id: data.stripeSubscriptionId,
+            status: data.status,
+            plan: data.plan,
+            current_period_start: payload.current_period_start,
+            current_period_end: payload.current_period_end,
+            cancel_at_period_end: payload.cancel_at_period_end,
+            updated_at: payload.updated_at,
+          }),
+        }
+      );
+
+      const patchResponseText = await response.text();
+      console.log("[upsertSubscription] PATCH Response:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: patchResponseText.substring(0, 500),
+      });
+    }
+
     if (!response.ok) {
+      const errorText = responseText || await response.text();
       console.error("[upsertSubscription] Failed to upsert subscription:", {
         status: response.status,
         statusText: response.statusText,
-        error: responseText,
+        error: errorText,
         userId: data.userId,
         payload: payload,
       });
-      throw new Error(`Failed to upsert subscription: ${response.status} ${responseText}`);
+      throw new Error(`Failed to upsert subscription: ${response.status} ${errorText}`);
     }
+
+    // Get the final response text (from POST or PATCH)
+    const finalResponseText = response.status === 409 
+      ? await response.text() 
+      : responseText;
 
     let result;
     try {
-      result = JSON.parse(responseText);
+      result = JSON.parse(finalResponseText);
     } catch (e) {
       // Response might not be JSON
-      result = responseText;
+      result = finalResponseText;
     }
 
     console.log("[upsertSubscription] Successfully upserted subscription:", {
       userId: data.userId,
+      method: response.status === 409 ? "PATCH (updated)" : "POST (created)",
       subscriptionId: Array.isArray(result) ? result[0]?.id : result?.id || "unknown",
       result: Array.isArray(result) ? result[0] : result,
     });
