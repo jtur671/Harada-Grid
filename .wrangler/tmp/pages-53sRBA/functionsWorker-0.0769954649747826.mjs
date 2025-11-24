@@ -32,7 +32,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../.wrangler/tmp/bundle-UkDJuR/checked-fetch.js
+// ../.wrangler/tmp/bundle-OZr2dx/checked-fetch.js
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
     (typeof request === "string" ? new Request(request, init) : request).url
@@ -50,7 +50,7 @@ function checkURL(request, init) {
 }
 var urls;
 var init_checked_fetch = __esm({
-  "../.wrangler/tmp/bundle-UkDJuR/checked-fetch.js"() {
+  "../.wrangler/tmp/bundle-OZr2dx/checked-fetch.js"() {
     urls = /* @__PURE__ */ new Set();
     __name(checkURL, "checkURL");
     globalThis.fetch = new Proxy(globalThis.fetch, {
@@ -9739,47 +9739,74 @@ async function upsertSubscription(data, env) {
     stripeCustomerId: data.stripeCustomerId,
     stripeSubscriptionId: data.stripeSubscriptionId,
     status: data.status,
-    plan: data.plan
+    plan: data.plan,
+    supabaseUrl: env.SUPABASE_URL ? `${env.SUPABASE_URL.substring(0, 20)}...` : "MISSING",
+    hasServiceKey: !!env.SUPABASE_SERVICE_ROLE_KEY
   });
-  const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/subscriptions`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates"
-      },
-      body: JSON.stringify({
-        user_id: data.userId,
-        stripe_customer_id: data.stripeCustomerId,
-        stripe_subscription_id: data.stripeSubscriptionId,
-        status: data.status,
-        plan: data.plan,
-        current_period_start: data.currentPeriodStart,
-        current_period_end: data.currentPeriodEnd,
-        cancel_at_period_end: data.cancelAtPeriodEnd,
-        updated_at: (/* @__PURE__ */ new Date()).toISOString()
-      })
-    }
-  );
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("[upsertSubscription] Failed to upsert subscription:", {
+  const payload = {
+    user_id: data.userId,
+    stripe_customer_id: data.stripeCustomerId,
+    stripe_subscription_id: data.stripeSubscriptionId,
+    status: data.status,
+    plan: data.plan,
+    current_period_start: data.currentPeriodStart,
+    current_period_end: data.currentPeriodEnd,
+    cancel_at_period_end: data.cancelAtPeriodEnd,
+    updated_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  console.log("[upsertSubscription] Payload:", JSON.stringify(payload, null, 2));
+  try {
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/subscriptions`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates"
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+    const responseText = await response.text();
+    console.log("[upsertSubscription] Response:", {
       status: response.status,
       statusText: response.statusText,
-      error: errorText,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: responseText.substring(0, 500)
+      // First 500 chars
+    });
+    if (!response.ok) {
+      console.error("[upsertSubscription] Failed to upsert subscription:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: responseText,
+        userId: data.userId,
+        payload
+      });
+      throw new Error(`Failed to upsert subscription: ${response.status} ${responseText}`);
+    }
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      result = responseText;
+    }
+    console.log("[upsertSubscription] Successfully upserted subscription:", {
+      userId: data.userId,
+      subscriptionId: Array.isArray(result) ? result[0]?.id : result?.id || "unknown",
+      result: Array.isArray(result) ? result[0] : result
+    });
+    return result;
+  } catch (error) {
+    console.error("[upsertSubscription] Exception during upsert:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : void 0,
       userId: data.userId
     });
-    throw new Error(`Failed to upsert subscription: ${response.status} ${errorText}`);
+    throw error;
   }
-  const result = await response.json();
-  console.log("[upsertSubscription] Successfully upserted subscription:", {
-    userId: data.userId,
-    subscriptionId: result[0]?.id || "unknown"
-  });
-  return result;
 }
 var onRequestPost3;
 var init_stripe_webhook = __esm({
@@ -9837,9 +9864,16 @@ var init_stripe_webhook = __esm({
           headers: { "Content-Type": "application/json" }
         });
       } catch (error) {
-        console.error("Error processing webhook:", error);
+        console.error("[webhook] Error processing webhook:", {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : void 0,
+          eventType: event?.type
+        });
         return new Response(
-          JSON.stringify({ error: "Webhook processing failed" }),
+          JSON.stringify({
+            error: "Webhook processing failed",
+            message: error instanceof Error ? error.message : String(error)
+          }),
           {
             status: 500,
             headers: { "Content-Type": "application/json" }
@@ -9903,11 +9937,11 @@ var init_functionsRoutes_0_34990220434492625 = __esm({
   }
 });
 
-// ../.wrangler/tmp/bundle-UkDJuR/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-OZr2dx/middleware-loader.entry.ts
 init_functionsRoutes_0_34990220434492625();
 init_checked_fetch();
 
-// ../.wrangler/tmp/bundle-UkDJuR/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-OZr2dx/middleware-insertion-facade.js
 init_functionsRoutes_0_34990220434492625();
 init_checked_fetch();
 
@@ -10408,7 +10442,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-UkDJuR/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-OZr2dx/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -10442,7 +10476,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-UkDJuR/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-OZr2dx/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

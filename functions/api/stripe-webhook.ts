@@ -90,9 +90,16 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Error processing webhook:", error);
+    console.error("[webhook] Error processing webhook:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      eventType: event?.type,
+    });
     return new Response(
-      JSON.stringify({ error: "Webhook processing failed" }),
+      JSON.stringify({ 
+        error: "Webhook processing failed",
+        message: error instanceof Error ? error.message : String(error),
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -391,51 +398,82 @@ async function upsertSubscription(
     stripeSubscriptionId: data.stripeSubscriptionId,
     status: data.status,
     plan: data.plan,
+    supabaseUrl: env.SUPABASE_URL ? `${env.SUPABASE_URL.substring(0, 20)}...` : "MISSING",
+    hasServiceKey: !!env.SUPABASE_SERVICE_ROLE_KEY,
   });
 
-  // Use POST with Prefer: resolution=merge-duplicates to handle upsert
-  // This will insert if user_id doesn't exist, or update if it does
-  const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/subscriptions`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates",
-      },
-      body: JSON.stringify({
-        user_id: data.userId,
-        stripe_customer_id: data.stripeCustomerId,
-        stripe_subscription_id: data.stripeSubscriptionId,
-        status: data.status,
-        plan: data.plan,
-        current_period_start: data.currentPeriodStart,
-        current_period_end: data.currentPeriodEnd,
-        cancel_at_period_end: data.cancelAtPeriodEnd,
-        updated_at: new Date().toISOString(),
-      }),
-    }
-  );
+  const payload = {
+    user_id: data.userId,
+    stripe_customer_id: data.stripeCustomerId,
+    stripe_subscription_id: data.stripeSubscriptionId,
+    status: data.status,
+    plan: data.plan,
+    current_period_start: data.currentPeriodStart,
+    current_period_end: data.currentPeriodEnd,
+    cancel_at_period_end: data.cancelAtPeriodEnd,
+    updated_at: new Date().toISOString(),
+  };
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("[upsertSubscription] Failed to upsert subscription:", {
+  console.log("[upsertSubscription] Payload:", JSON.stringify(payload, null, 2));
+
+  try {
+    // Use POST with Prefer: resolution=merge-duplicates to handle upsert
+    // This will insert if user_id doesn't exist, or update if it does
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/subscriptions`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const responseText = await response.text();
+    console.log("[upsertSubscription] Response:", {
       status: response.status,
       statusText: response.statusText,
-      error: errorText,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: responseText.substring(0, 500), // First 500 chars
+    });
+
+    if (!response.ok) {
+      console.error("[upsertSubscription] Failed to upsert subscription:", {
+        status: response.status,
+        statusText: response.statusText,
+        error: responseText,
+        userId: data.userId,
+        payload: payload,
+      });
+      throw new Error(`Failed to upsert subscription: ${response.status} ${responseText}`);
+    }
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      // Response might not be JSON
+      result = responseText;
+    }
+
+    console.log("[upsertSubscription] Successfully upserted subscription:", {
+      userId: data.userId,
+      subscriptionId: Array.isArray(result) ? result[0]?.id : result?.id || "unknown",
+      result: Array.isArray(result) ? result[0] : result,
+    });
+    return result;
+  } catch (error) {
+    console.error("[upsertSubscription] Exception during upsert:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
       userId: data.userId,
     });
-    throw new Error(`Failed to upsert subscription: ${response.status} ${errorText}`);
+    throw error;
   }
-
-  const result = await response.json();
-  console.log("[upsertSubscription] Successfully upserted subscription:", {
-    userId: data.userId,
-    subscriptionId: result[0]?.id || "unknown",
-  });
-  return result;
 }
 
 
