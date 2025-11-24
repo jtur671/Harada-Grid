@@ -71,95 +71,62 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
         // If we have a user already, use it (App.tsx should have loaded it)
         if (currentUser) {
           console.log("[SuccessPage] User already in state:", currentUser.email);
-        } else if (hasOAuthTokens) {
-          // OAuth tokens detected - wait for Supabase to process them
-          console.log("[SuccessPage] OAuth tokens detected, waiting for Supabase to process...");
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          
-          // Try to get session with timeout
-          try {
-            const sessionPromise = supabase.auth.getSession();
-            const timeoutPromise = new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error("Session check timeout")), 5000)
-            );
-            
-            const { data: sessionData, error: sessionError } = await Promise.race([
-              sessionPromise,
-              timeoutPromise,
-            ]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
-            
-            if (sessionError) {
-              console.error("[SuccessPage] Error getting session:", sessionError);
-              setError("Failed to restore session. Please log in again.");
-              setIsLoading(false);
-              return;
-            }
-            currentUser = sessionData.session?.user ?? null;
-            if (!currentUser) {
-              console.error("[SuccessPage] No session found after OAuth");
-              setError("No active session found. Please log in again.");
-              setIsLoading(false);
-              return;
-            }
-            console.log("[SuccessPage] Session restored for user:", currentUser.email);
-            if (onSetUser) {
-              onSetUser(currentUser);
-            }
-          } catch (err) {
-            console.error("[SuccessPage] Session check failed:", err);
-            setError("Unable to verify session. Please try logging in again.");
-            setIsLoading(false);
-            return;
-          }
         } else {
-          // No user in state - App.tsx should have loaded it, but try to get it directly
+          // No user in state - try to get it directly from Supabase
           console.log("[SuccessPage] No user in state, getting session directly...");
           
-          try {
-            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-            
-            if (sessionError) {
-              console.error("[SuccessPage] Error getting session:", sessionError);
-              setError("Failed to restore session. Please log in again.");
-              setIsLoading(false);
-              return;
-            }
-            
-            currentUser = sessionData?.session?.user ?? null;
-            
-            if (currentUser) {
-              console.log("[SuccessPage] Session found directly:", currentUser.email);
-              if (onSetUser) {
-                onSetUser(currentUser);
-              }
-            } else {
-              // No session found - wait a moment for App.tsx to finish loading
-              console.log("[SuccessPage] No session found, waiting for App.tsx...");
-              await new Promise((resolve) => setTimeout(resolve, 1000));
+          // If OAuth tokens detected, wait a moment for Supabase to process them
+          if (hasOAuthTokens) {
+            console.log("[SuccessPage] OAuth tokens detected, waiting for Supabase to process...");
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+          }
+          
+          // Try to get session - with retries
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
               
-              // Check user prop again (App.tsx might have updated it)
+              if (sessionError) {
+                console.warn(`[SuccessPage] Session check attempt ${attempt + 1} error:`, sessionError);
+                if (attempt < 2) {
+                  await new Promise((resolve) => setTimeout(resolve, 500));
+                  continue;
+                }
+              }
+              
+              if (sessionData?.session?.user) {
+                currentUser = sessionData.session.user;
+                console.log("[SuccessPage] Session found on attempt", attempt + 1, ":", currentUser.email);
+                if (onSetUser) {
+                  onSetUser(currentUser);
+                }
+                break;
+              }
+              
+              // If no session but not last attempt, wait and retry
+              if (attempt < 2) {
+                console.log(`[SuccessPage] No session on attempt ${attempt + 1}, waiting and retrying...`);
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              }
+            } catch (err) {
+              console.warn(`[SuccessPage] Session check attempt ${attempt + 1} exception:`, err);
+              if (attempt < 2) {
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              }
+            }
+          }
+          
+          // If still no user after retries, check if user prop was updated by App.tsx
+          if (!currentUser && !cancelled) {
+            // Wait a bit more for App.tsx to finish loading
+            console.log("[SuccessPage] No session found, waiting for App.tsx to load user...");
+            for (let i = 0; i < 4; i++) {
+              await new Promise((resolve) => setTimeout(resolve, 500));
               if (user && !cancelled) {
                 currentUser = user;
                 console.log("[SuccessPage] User loaded by App.tsx after wait:", currentUser.email);
-              } else {
-                // Try one more time to get session
-                const { data: retryData } = await supabase.auth.getSession();
-                if (retryData?.session?.user) {
-                  currentUser = retryData.session.user;
-                  console.log("[SuccessPage] Session found on retry:", currentUser.email);
-                  if (onSetUser) {
-                    onSetUser(currentUser);
-                  }
-                }
+                break;
               }
-            }
-          } catch (err) {
-            console.error("[SuccessPage] Session check failed:", err);
-            // Don't error out immediately - wait for App.tsx
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            if (user && !cancelled) {
-              currentUser = user;
-              console.log("[SuccessPage] User loaded by App.tsx after error:", currentUser.email);
             }
           }
           
