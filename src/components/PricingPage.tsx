@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { AppHeader } from "./AppHeader";
 import { AuthModal } from "./AuthModal";
@@ -33,19 +33,6 @@ export const PricingPage: React.FC<PricingPageProps> = ({
   const [modalType, setModalType] = useState<ModalType>(null);
 
   const closeModal = () => setModalType(null);
-
-  // Redirect Pro users away from pricing page
-  // This handles the case where they complete checkout and are still on pricing
-  useEffect(() => {
-    if (isLoggedIn && isPro) {
-      console.log("[PricingPage] User is Pro, redirecting to dashboard");
-      // Small delay to ensure subscription status is fully loaded
-      const timer = setTimeout(() => {
-        onSetAppView("dashboard");
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoggedIn, isPro, onSetAppView]);
 
   return (
     <div className="app app-dark">

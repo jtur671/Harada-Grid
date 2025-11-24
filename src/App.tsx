@@ -54,6 +54,7 @@ const App: React.FC = () => {
   const [isPillarRefining, setIsPillarRefining] = useState<boolean>(false);
   const [resetOpen, setResetOpen] = useState<boolean>(false);
   const [startModalOpen, setStartModalOpen] = useState<boolean>(false);
+  const [pendingCheckoutRedirect, setPendingCheckoutRedirect] = useState<boolean>(false);
 
   const [exampleId, setExampleId] = useState<ExampleId>("career");
   const [exampleState, setExampleState] = useState<HaradaState>(() =>
@@ -274,7 +275,7 @@ const App: React.FC = () => {
     // Only save to localStorage for non-logged-in users or when there's no current project
     // This prevents localStorage from overwriting the loaded project state
     if (!isLoggedIn || !currentProjectId) {
-      saveState(state);
+    saveState(state);
     }
   }, [state, isLoggedIn, currentProjectId]);
 
@@ -290,6 +291,102 @@ const App: React.FC = () => {
       setLastView(appView);
     }
   }, [appView]);
+
+  // Detect if we just returned from Stripe checkout (success URL adds session params)
+  useEffect(() => {
+    const successStatuses = new Set(["success", "complete"]);
+    let detectedReturn = false;
+
+    const cleanSearchParams = () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const sessionId = searchParams.get("session_id");
+      const redirectStatus = searchParams.get("redirect_status");
+      if (sessionId || (redirectStatus && successStatuses.has(redirectStatus.toLowerCase()))) {
+        detectedReturn = true;
+        searchParams.delete("session_id");
+        searchParams.delete("redirect_status");
+        const newSearch = searchParams.toString();
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${window.location.hash}`
+        );
+      }
+    };
+
+    const cleanHashParams = () => {
+      const hash = window.location.hash;
+      const questionIndex = hash.indexOf("?");
+      if (questionIndex === -1) {
+        return;
+      }
+      const hashBase = hash.substring(0, questionIndex);
+      const hashQuery = hash.substring(questionIndex + 1);
+      const hashParams = new URLSearchParams(hashQuery);
+      const sessionId = hashParams.get("session_id");
+      const redirectStatus = hashParams.get("redirect_status");
+      if (sessionId || (redirectStatus && successStatuses.has(redirectStatus.toLowerCase()))) {
+        detectedReturn = true;
+        hashParams.delete("session_id");
+        hashParams.delete("redirect_status");
+        const newHashQuery = hashParams.toString();
+        const newHash = newHashQuery ? `${hashBase}?${newHashQuery}` : hashBase;
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${window.location.search}${newHash}`
+        );
+      }
+    };
+
+    cleanSearchParams();
+    cleanHashParams();
+
+    if (detectedReturn) {
+      console.log("[Stripe] Detected successful return from checkout");
+      setPendingCheckoutRedirect(true);
+    }
+  }, []);
+
+  // When we know the user just came back from checkout, make sure they land on dashboard
+  useEffect(() => {
+    if (!pendingCheckoutRedirect) {
+      return;
+    }
+
+    const ensureSessionAndRedirect = async () => {
+      let currentUser = user;
+      if (!currentUser) {
+        const { data } = await supabase.auth.getSession();
+        currentUser = data.session?.user ?? null;
+        if (currentUser) {
+          setUser(currentUser);
+        }
+      }
+
+      if (!currentUser) {
+        // Still not logged in - wait for auth to initialize
+        return;
+      }
+
+      console.log("[Stripe] Finalizing post-checkout redirect for user:", currentUser.email);
+      setAppView("dashboard");
+
+      // Refresh subscription status immediately
+      getSubscriptionStatus(currentUser.id).then((status) => {
+        if (status) {
+          console.log("[Stripe] Subscription after checkout:", status.plan);
+          setSubscriptionStatus(status.plan);
+        }
+      });
+
+      // Reload projects but preserve current view (already forced to dashboard)
+      loadProjectsForUser(currentUser, true);
+      setPendingCheckoutRedirect(false);
+    };
+
+    ensureSessionAndRedirect();
+  }, [pendingCheckoutRedirect, user, loadProjectsForUser]);
 
   // Load current session + watch for changes
   useEffect(() => {
