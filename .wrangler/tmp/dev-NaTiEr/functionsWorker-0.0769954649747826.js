@@ -79,7 +79,7 @@ function checkURL2(request, init) {
 __name(checkURL2, "checkURL");
 var urls2;
 var init_checked_fetch = __esm({
-  "../.wrangler/tmp/bundle-NfmzST/checked-fetch.js"() {
+  "../.wrangler/tmp/bundle-aVeUVj/checked-fetch.js"() {
     urls2 = /* @__PURE__ */ new Set();
     __name2(checkURL2, "checkURL");
     globalThis.fetch = new Proxy(globalThis.fetch, {
@@ -9688,13 +9688,18 @@ async function handleSubscriptionUpdate(subscription, env, stripe) {
       convertedStart: currentPeriodStart,
       convertedEnd: currentPeriodEnd
     });
+    const plan = subscription.status === "active" || subscription.status === "trialing" ? "premium" : "free";
+    console.log("[handleSubscriptionUpdate] Plan determination:", {
+      status: subscription.status,
+      plan
+    });
     await upsertSubscription(
       {
         userId,
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscription.id,
         status: subscription.status,
-        plan: subscription.status === "active" ? "premium" : "free",
+        plan,
         currentPeriodStart,
         currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end || false

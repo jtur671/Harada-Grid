@@ -375,6 +375,17 @@ async function handleSubscriptionUpdate(
       convertedEnd: currentPeriodEnd,
     });
 
+    // Determine plan based on subscription status
+    // trialing, active = premium; canceled, past_due (if canceled) = free
+    const plan = (subscription.status === "active" || subscription.status === "trialing")
+      ? "premium"
+      : "free";
+
+    console.log("[handleSubscriptionUpdate] Plan determination:", {
+      status: subscription.status,
+      plan: plan,
+    });
+
     // Upsert subscription record
     await upsertSubscription(
       {
@@ -382,7 +393,7 @@ async function handleSubscriptionUpdate(
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscription.id,
         status: subscription.status,
-        plan: subscription.status === "active" ? "premium" : "free",
+        plan: plan,
         currentPeriodStart,
         currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end || false,

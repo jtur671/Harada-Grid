@@ -276,19 +276,35 @@ const App: React.FC = () => {
       if (current) {
         // On initial load (page refresh), always let loadProjects decide the view
         // This ensures logged-in users go to dashboard, not home
-        // If coming back from OAuth (Stripe checkout), clear hash and let loadProjects redirect
+        // If coming back from OAuth (Stripe checkout), clear hash and redirect
         if (hasOAuthTokens) {
           // Clear the hash to clean up the URL
           window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          // Force redirect - wait a moment for webhook to process subscription
+          setTimeout(() => {
+            if (!cancelled) {
+              // Refresh subscription status first (webhook may have just created it)
+              getSubscriptionStatus(current.id).then((status) => {
+                if (status && !cancelled) {
+                  setSubscriptionStatus(status.plan);
+                }
+                // Then force redirect to dashboard, don't preserve pricing page
+                if (!cancelled) {
+                  loadProjectsForUser(current, false);
+                }
+              });
+            }
+          }, 2000); // Give webhook 2 seconds to process
+        } else {
+          setTimeout(() => {
+            if (!cancelled) {
+              // On refresh, always let loadProjects set the appropriate view
+              // (dashboard if has projects or subscription, pricing if no plan, etc.)
+              // Don't preserve view - let it decide based on user's projects and subscription
+              loadProjectsForUser(current, false);
+            }
+          }, 100);
         }
-        setTimeout(() => {
-          if (!cancelled) {
-            // On refresh, always let loadProjects set the appropriate view
-            // (dashboard if has projects or subscription, pricing if no plan, etc.)
-            // Don't preserve view - let it decide based on user's projects and subscription
-            loadProjectsForUser(current, false);
-          }
-        }, 100);
       } else {
         // Only set to home if not logged in AND not already in a logged-out view
         // BUT only on initial load - after that, preserve view
@@ -333,8 +349,18 @@ const App: React.FC = () => {
               if (isOAuthCallback) {
                 // Clear the hash to clean up the URL
                 window.history.replaceState(null, "", window.location.pathname + window.location.search);
-                // Let loadProjects decide where to go (dashboard if has subscription, etc.)
-                loadProjectsForUser(u, false);
+                // Wait a moment for webhook to process subscription, then force redirect
+                // Don't preserve pricing page - always redirect to dashboard
+                setTimeout(() => {
+                  // Force redirect - refresh subscription status first
+                  getSubscriptionStatus(u.id).then((status) => {
+                    if (status) {
+                      setSubscriptionStatus(status.plan);
+                    }
+                    // Then load projects which will redirect appropriately
+                    loadProjectsForUser(u, false);
+                  });
+                }, 2000); // Give webhook 2 seconds to process
                 return;
               }
               

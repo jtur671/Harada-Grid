@@ -32,7 +32,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../.wrangler/tmp/bundle-NfmzST/checked-fetch.js
+// ../.wrangler/tmp/bundle-aVeUVj/checked-fetch.js
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
     (typeof request === "string" ? new Request(request, init) : request).url
@@ -50,7 +50,7 @@ function checkURL(request, init) {
 }
 var urls;
 var init_checked_fetch = __esm({
-  "../.wrangler/tmp/bundle-NfmzST/checked-fetch.js"() {
+  "../.wrangler/tmp/bundle-aVeUVj/checked-fetch.js"() {
     urls = /* @__PURE__ */ new Set();
     __name(checkURL, "checkURL");
     globalThis.fetch = new Proxy(globalThis.fetch, {
@@ -9699,13 +9699,18 @@ async function handleSubscriptionUpdate(subscription, env, stripe) {
       convertedStart: currentPeriodStart,
       convertedEnd: currentPeriodEnd
     });
+    const plan = subscription.status === "active" || subscription.status === "trialing" ? "premium" : "free";
+    console.log("[handleSubscriptionUpdate] Plan determination:", {
+      status: subscription.status,
+      plan
+    });
     await upsertSubscription(
       {
         userId,
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscription.id,
         status: subscription.status,
-        plan: subscription.status === "active" ? "premium" : "free",
+        plan,
         currentPeriodStart,
         currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end || false
@@ -10013,11 +10018,11 @@ var init_functionsRoutes_0_34990220434492625 = __esm({
   }
 });
 
-// ../.wrangler/tmp/bundle-NfmzST/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-aVeUVj/middleware-loader.entry.ts
 init_functionsRoutes_0_34990220434492625();
 init_checked_fetch();
 
-// ../.wrangler/tmp/bundle-NfmzST/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-aVeUVj/middleware-insertion-facade.js
 init_functionsRoutes_0_34990220434492625();
 init_checked_fetch();
 
@@ -10518,7 +10523,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-NfmzST/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-aVeUVj/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -10552,7 +10557,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-NfmzST/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-aVeUVj/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
