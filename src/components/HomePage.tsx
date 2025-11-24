@@ -41,6 +41,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           isAdmin={isAdmin}
           isPro={isPro}
           onSetAuthView={onSetAuthView}
+          onGoToHome={() => onSetAppView("home")}
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
           onGoToSupport={() => onSetAppView("support")}

@@ -42,6 +42,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
           isAdmin={isAdmin}
           isPro={isPro}
           onSetAuthView={onSetAuthView}
+          onGoToHome={() => onSetAppView("home")}
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
           onGoToSupport={() => onSetAppView("support")}

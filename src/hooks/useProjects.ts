@@ -50,10 +50,11 @@ export const useProjects = ({
   const loadProjects = useCallback(async (preserveView = false) => {
     if (!user) return;
     
-    // CRITICAL: If we're viewing a project and not preserving view, never reload
-    // (it will interrupt the user and redirect them to dashboard)
-    if (currentProjectId && !preserveView) {
-      return; // Don't interrupt user's workflow
+    // CRITICAL: If we're viewing a project, never reload (even with preserveView)
+    // This prevents any interruptions when user is editing
+    if (currentProjectId) {
+      console.log("[loadProjects] Skipping - user has project open:", currentProjectId);
+      return; // Don't interrupt user's workflow at all
     }
     
     // Aggressive guard: Don't load if we just loaded within the last 2 seconds

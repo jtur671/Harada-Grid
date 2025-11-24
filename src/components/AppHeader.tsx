@@ -11,6 +11,7 @@ type AppHeaderProps = {
   isAdmin: boolean;
   isPro?: boolean;
   onSetAuthView: (view: AuthView) => void;
+  onGoToHome?: () => void;
   onGoToPricing?: () => void;
   onGoToDashboard?: () => void;
   onGoToSupport?: () => void;
@@ -23,6 +24,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   isAdmin,
   isPro = false,
   onSetAuthView,
+  onGoToHome,
   onGoToPricing,
   onGoToDashboard,
   onGoToSupport,
@@ -31,7 +33,19 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   return (
     <header className="home-nav">
-      <div className="home-logo">
+      <div 
+        className="home-logo" 
+        onClick={onGoToHome}
+        style={{ cursor: onGoToHome ? "pointer" : "default" }}
+        role={onGoToHome ? "button" : undefined}
+        tabIndex={onGoToHome ? 0 : undefined}
+        onKeyDown={onGoToHome ? (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onGoToHome();
+          }
+        } : undefined}
+      >
         <span className="home-logo-mark">◆</span>
         <span className="home-logo-text">
           Action<span>Maps</span>

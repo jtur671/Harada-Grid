@@ -112,38 +112,64 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
             return;
           }
         } else {
-          // No user and no OAuth tokens - try a quick session check
-          console.log("[SuccessPage] No user in state, checking session...");
+          // No user in state - App.tsx should have loaded it, but try to get it directly
+          console.log("[SuccessPage] No user in state, getting session directly...");
+          
           try {
-            const { data: sessionData, error: sessionError } = await Promise.race([
-              supabase.auth.getSession(),
-              new Promise<never>((_, reject) => 
-                setTimeout(() => reject(new Error("Session check timeout")), 3000)
-              ),
-            ]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
             
-            if (!sessionError && sessionData?.session?.user) {
-              currentUser = sessionData.session.user;
-              console.log("[SuccessPage] Session found for user:", currentUser.email);
+            if (sessionError) {
+              console.error("[SuccessPage] Error getting session:", sessionError);
+              setError("Failed to restore session. Please log in again.");
+              setIsLoading(false);
+              return;
+            }
+            
+            currentUser = sessionData?.session?.user ?? null;
+            
+            if (currentUser) {
+              console.log("[SuccessPage] Session found directly:", currentUser.email);
               if (onSetUser) {
                 onSetUser(currentUser);
               }
             } else {
-              console.warn("[SuccessPage] No session found, but continuing anyway (user may be logged in via App.tsx)");
-              // Don't error out - App.tsx might be loading the user
+              // No session found - wait a moment for App.tsx to finish loading
+              console.log("[SuccessPage] No session found, waiting for App.tsx...");
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              
+              // Check user prop again (App.tsx might have updated it)
+              if (user && !cancelled) {
+                currentUser = user;
+                console.log("[SuccessPage] User loaded by App.tsx after wait:", currentUser.email);
+              } else {
+                // Try one more time to get session
+                const { data: retryData } = await supabase.auth.getSession();
+                if (retryData?.session?.user) {
+                  currentUser = retryData.session.user;
+                  console.log("[SuccessPage] Session found on retry:", currentUser.email);
+                  if (onSetUser) {
+                    onSetUser(currentUser);
+                  }
+                }
+              }
             }
           } catch (err) {
-            console.warn("[SuccessPage] Session check failed, but continuing:", err);
-            // Don't error out - App.tsx might be loading the user
+            console.error("[SuccessPage] Session check failed:", err);
+            // Don't error out immediately - wait for App.tsx
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            if (user && !cancelled) {
+              currentUser = user;
+              console.log("[SuccessPage] User loaded by App.tsx after error:", currentUser.email);
+            }
           }
-        }
-        
-        // If still no user after all checks, show error
-        if (!currentUser) {
-          console.error("[SuccessPage] No user found after all checks");
-          setError("Please log in to continue.");
-          setIsLoading(false);
-          return;
+          
+          // If still no user, show error
+          if (!currentUser) {
+            console.error("[SuccessPage] No user found after all attempts");
+            setError("Unable to verify your session. Please try logging in again.");
+            setIsLoading(false);
+            return;
+          }
         }
 
         // Step 3: Wait for webhook to process (give it 3 seconds)
@@ -214,6 +240,7 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
           isAdmin={isAdmin}
           isPro={isPro}
           onSetAuthView={onSetAuthView}
+          onGoToHome={() => onSetAppView("home")}
           onGoToPricing={() => onSetAppView("pricing")}
           onGoToDashboard={() => onSetAppView("dashboard")}
           onGoToSupport={() => onSetAppView("support")}

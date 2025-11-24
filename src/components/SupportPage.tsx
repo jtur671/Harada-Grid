@@ -10,6 +10,7 @@ type SupportPageProps = {
   isAdmin: boolean;
   isPro?: boolean;
   onSetAuthView: (view: AuthView) => void;
+  onGoToHome?: () => void;
   onGoToPricing?: () => void;
   onGoToDashboard?: () => void;
 };
@@ -19,6 +20,7 @@ export const SupportPage: React.FC<SupportPageProps> = ({
   isAdmin,
   isPro = false,
   onSetAuthView,
+  onGoToHome,
   onGoToPricing,
   onGoToDashboard,
 }) => {
@@ -31,6 +33,7 @@ export const SupportPage: React.FC<SupportPageProps> = ({
           isAdmin={isAdmin}
           isPro={isPro}
           onSetAuthView={onSetAuthView}
+          onGoToHome={onGoToHome}
           onGoToPricing={onGoToPricing}
           onGoToDashboard={onGoToDashboard}
         />

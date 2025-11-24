@@ -119,6 +119,16 @@ const App: React.FC = () => {
     updateProjectInListRef.current = updateProjectInList;
   }, [updateProjectInList]);
 
+  // Default to "free" plan for logged-in users who don't have a plan set
+  // This prevents new users from being redirected to pricing page
+  useEffect(() => {
+    if (isLoggedIn && user && !plan) {
+      console.log("[App] New logged-in user detected, setting default plan to 'free'");
+      setPlan("free");
+      savePlanToStorage("free");
+    }
+  }, [isLoggedIn, user, plan]);
+
   // Check if user has reached their map limit
   const mapLimit = isPro ? PRO_PLAN_MAP_LIMIT : FREE_PLAN_MAP_LIMIT;
   const hasReachedMapLimit = !isPro && projects.length >= FREE_PLAN_MAP_LIMIT;
@@ -405,29 +415,33 @@ const App: React.FC = () => {
     ensureSessionAndRedirect();
   }, [pendingCheckoutRedirect, user, loadProjectsForUser]);
 
-  // Check hash on mount and whenever it changes - handle success redirect immediately
+  // Check hash on mount and whenever it changes - but only set view if user is loaded
+  // The main session loading effect will handle the redirect properly
   useEffect(() => {
     const checkHash = () => {
       const hash = window.location.hash;
-      if (hash.startsWith("#success")) {
-        console.log("[App] Hash check: detected #success, ensuring view is set to success");
+      if (hash.startsWith("#success") && user) {
+        // Only set view if user is already loaded (prevents race condition)
+        console.log("[App] Hash check: detected #success with user loaded, ensuring view is set to success");
         setAppView("success");
       }
     };
     
-    // Check immediately
-    checkHash();
+    // Check if user is loaded, then check hash
+    if (user) {
+      checkHash();
+    }
     
     // Also listen for hash changes
     window.addEventListener("hashchange", checkHash);
     return () => window.removeEventListener("hashchange", checkHash);
-  }, []);
+  }, [user]);
 
   // Load current session + watch for changes
   useEffect(() => {
     let cancelled = false;
     
-    // Check if we're coming back from Stripe checkout success - DO THIS SYNCHRONOUSLY
+    // Check if we're coming back from Stripe checkout success
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const sessionId = urlParams.get("session_id") || hashParams.get("session_id");
@@ -435,35 +449,33 @@ const App: React.FC = () => {
     const isStripeSuccess = sessionId || (redirectStatus && redirectStatus === "succeeded");
     const isSuccessHash = window.location.hash.startsWith("#success");
     
-    // If we detect success hash, set view immediately (before async session load)
-    if (isSuccessHash || isStripeSuccess) {
-      console.log("[Stripe] Detected success hash/params, setting view to success immediately");
-      setAppView("success");
-      // Clean up URL immediately
-      const cleanParams = new URLSearchParams(urlParams);
-      cleanParams.delete("session_id");
-      cleanParams.delete("redirect_status");
-      const newSearch = cleanParams.toString();
-      const cleanHash = hashParams.has("access_token") ? window.location.hash : "";
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${cleanHash}`
-      );
-    }
-    
     // Check if we're coming back from OAuth (has tokens in URL hash, but not success)
     const hasOAuthTokens = !isSuccessHash && (hashParams.has("access_token") || hashParams.has("error"));
     
-    // Load session, then handle other redirects
+    // Load session FIRST, then handle redirects (including success page)
+    // This ensures user is loaded before SuccessPage tries to use it
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       const current = data.session?.user ?? null;
       setUser(current);
       
-      // If we already set success view above, just load subscription/projects in background
+      // If Stripe success, redirect to success page AFTER loading session
+      // This ensures user is available when SuccessPage renders
       if (isStripeSuccess || isSuccessHash) {
-        console.log("[Stripe] Session loaded, refreshing subscription status in background");
+        console.log("[Stripe] Detected success, session loaded for user:", current?.email || "none");
+        // Clean up URL
+        const cleanParams = new URLSearchParams(urlParams);
+        cleanParams.delete("session_id");
+        cleanParams.delete("redirect_status");
+        const newSearch = cleanParams.toString();
+        const cleanHash = hashParams.has("access_token") ? window.location.hash : "";
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${cleanHash}`
+        );
+        // Set view to success now that user is loaded
+        setAppView("success");
         // Load subscription status and projects in background
         if (current) {
           setTimeout(() => {
@@ -559,8 +571,10 @@ const App: React.FC = () => {
               clearTimeout(authHandlerTimeoutRef.current);
             }
             
-            // Skip if we're in builder view with a project open - don't interrupt the user
+            // CRITICAL: Skip if we're in builder view with a project open - don't interrupt the user
+            // This prevents redirects when user is editing (viewMode === "map")
             if (currentView === "builder" && currentProjectId) {
+              console.log("[Auth] Skipping loadProjects - user is in builder with project open");
               return currentView;
             }
             
@@ -943,6 +957,7 @@ const App: React.FC = () => {
         isAdmin={isAdmin}
         isPro={isPro}
         onSetAuthView={setAuthView}
+        onGoToHome={() => setAppView("home")}
         onGoToPricing={() => setAppView("pricing")}
         onGoToDashboard={() => setAppView("dashboard")}
       />
