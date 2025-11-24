@@ -79,7 +79,7 @@ function checkURL2(request, init) {
 __name(checkURL2, "checkURL");
 var urls2;
 var init_checked_fetch = __esm({
-  "../.wrangler/tmp/bundle-GQ3OFV/checked-fetch.js"() {
+  "../.wrangler/tmp/bundle-UkDJuR/checked-fetch.js"() {
     urls2 = /* @__PURE__ */ new Set();
     __name2(checkURL2, "checkURL");
     globalThis.fetch = new Proxy(globalThis.fetch, {
@@ -9523,89 +9523,181 @@ var init_stripe_esm_worker = __esm({
   }
 });
 async function handleCheckoutCompleted(session, env, stripe) {
+  console.log("[handleCheckoutCompleted] Processing checkout session:", {
+    sessionId: session.id,
+    customerId: session.customer,
+    subscriptionId: session.subscription
+  });
   const customerId = session.customer;
   const subscriptionId = session.subscription;
   if (!customerId || !subscriptionId) {
-    console.error("Missing customer or subscription ID in checkout session");
+    console.error("[handleCheckoutCompleted] Missing customer or subscription ID:", {
+      customerId,
+      subscriptionId
+    });
     return;
   }
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const customer = await stripe.customers.retrieve(customerId);
-  const customerEmail = typeof customer === "object" && !customer.deleted ? customer.email : null;
-  if (!customerEmail) {
-    console.error("Could not find customer email");
-    return;
-  }
-  const userResponse = await fetch(
-    `${env.SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(
-      customerEmail
-    )}`,
-    {
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY
-      }
+  try {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    console.log("[handleCheckoutCompleted] Retrieved subscription:", {
+      id: subscription.id,
+      status: subscription.status
+    });
+    const customer = await stripe.customers.retrieve(customerId);
+    const customerEmail = typeof customer === "object" && !customer.deleted ? customer.email : null;
+    if (!customerEmail) {
+      console.error("[handleCheckoutCompleted] Could not find customer email for customer:", customerId);
+      return;
     }
-  );
-  const users = await userResponse.json();
-  if (!users.users || users.users.length === 0) {
-    console.error(`User not found for email: ${customerEmail}`);
-    return;
-  }
-  const userId = users.users[0].id;
-  await upsertSubscription(
-    {
+    console.log("[handleCheckoutCompleted] Looking up user by email:", customerEmail);
+    const userResponse = await fetch(
+      `${env.SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(
+        customerEmail
+      )}`,
+      {
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY
+        }
+      }
+    );
+    if (!userResponse.ok) {
+      const errorText = await userResponse.text();
+      console.error("[handleCheckoutCompleted] Failed to fetch user:", {
+        status: userResponse.status,
+        error: errorText
+      });
+      return;
+    }
+    const users = await userResponse.json();
+    if (!users.users || users.users.length === 0) {
+      console.error(`[handleCheckoutCompleted] User not found for email: ${customerEmail}`);
+      return;
+    }
+    const userId = users.users[0].id;
+    console.log("[handleCheckoutCompleted] Found user:", {
       userId,
-      stripeCustomerId: customerId,
-      stripeSubscriptionId: subscriptionId,
-      status: subscription.status,
-      plan: "premium",
-      currentPeriodStart: new Date(
-        subscription.current_period_start * 1e3
-      ).toISOString(),
-      currentPeriodEnd: new Date(
-        subscription.current_period_end * 1e3
-      ).toISOString(),
-      cancelAtPeriodEnd: subscription.cancel_at_period_end || false
-    },
-    env
-  );
+      email: customerEmail
+    });
+    await upsertSubscription(
+      {
+        userId,
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscriptionId,
+        status: subscription.status,
+        plan: "premium",
+        currentPeriodStart: new Date(
+          subscription.current_period_start * 1e3
+        ).toISOString(),
+        currentPeriodEnd: new Date(
+          subscription.current_period_end * 1e3
+        ).toISOString(),
+        cancelAtPeriodEnd: subscription.cancel_at_period_end || false
+      },
+      env
+    );
+    console.log("[handleCheckoutCompleted] Successfully processed checkout");
+  } catch (error) {
+    console.error("[handleCheckoutCompleted] Error processing checkout:", error);
+    throw error;
+  }
 }
 __name(handleCheckoutCompleted, "handleCheckoutCompleted");
 async function handleSubscriptionUpdate(subscription, env, stripe) {
+  console.log("[handleSubscriptionUpdate] Processing subscription:", {
+    subscriptionId: subscription.id,
+    customerId: subscription.customer,
+    status: subscription.status
+  });
   const customerId = subscription.customer;
-  const { data: subscriptions } = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/subscriptions?stripe_customer_id=eq.${customerId}&select=user_id`,
-    {
-      headers: {
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        "Content-Type": "application/json"
+  try {
+    const existingSubResponse = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/subscriptions?stripe_customer_id=eq.${customerId}&select=user_id`,
+      {
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json"
+        }
       }
+    );
+    if (!existingSubResponse.ok) {
+      const errorText = await existingSubResponse.text();
+      console.error("[handleSubscriptionUpdate] Failed to query existing subscription:", {
+        status: existingSubResponse.status,
+        error: errorText
+      });
     }
-  ).then((r) => r.json());
-  if (!subscriptions || subscriptions.length === 0) {
-    console.error(`Subscription not found for customer: ${customerId}`);
-    return;
+    const { data: subscriptions } = await existingSubResponse.json();
+    let userId = null;
+    if (subscriptions && subscriptions.length > 0) {
+      userId = subscriptions[0].user_id;
+      console.log("[handleSubscriptionUpdate] Found existing subscription with user:", userId);
+    } else {
+      console.log("[handleSubscriptionUpdate] Subscription not found, looking up user by email");
+      const customer = await stripe.customers.retrieve(customerId);
+      const customerEmail = typeof customer === "object" && !customer.deleted ? customer.email : null;
+      if (!customerEmail) {
+        console.error("[handleSubscriptionUpdate] Could not find customer email for customer:", customerId);
+        return;
+      }
+      console.log("[handleSubscriptionUpdate] Looking up user by email:", customerEmail);
+      const userResponse = await fetch(
+        `${env.SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(
+          customerEmail
+        )}`,
+        {
+          headers: {
+            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+            apikey: env.SUPABASE_SERVICE_ROLE_KEY
+          }
+        }
+      );
+      if (!userResponse.ok) {
+        const errorText = await userResponse.text();
+        console.error("[handleSubscriptionUpdate] Failed to fetch user:", {
+          status: userResponse.status,
+          error: errorText
+        });
+        return;
+      }
+      const users = await userResponse.json();
+      if (!users.users || users.users.length === 0) {
+        console.error(`[handleSubscriptionUpdate] User not found for email: ${customerEmail}`);
+        return;
+      }
+      userId = users.users[0].id;
+      console.log("[handleSubscriptionUpdate] Found user:", {
+        userId,
+        email: customerEmail
+      });
+    }
+    if (!userId) {
+      console.error("[handleSubscriptionUpdate] Could not determine user_id");
+      return;
+    }
+    await upsertSubscription(
+      {
+        userId,
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscription.id,
+        status: subscription.status,
+        plan: subscription.status === "active" ? "premium" : "free",
+        currentPeriodStart: new Date(
+          subscription.current_period_start * 1e3
+        ).toISOString(),
+        currentPeriodEnd: new Date(
+          subscription.current_period_end * 1e3
+        ).toISOString(),
+        cancelAtPeriodEnd: subscription.cancel_at_period_end || false
+      },
+      env
+    );
+    console.log("[handleSubscriptionUpdate] Successfully processed subscription");
+  } catch (error) {
+    console.error("[handleSubscriptionUpdate] Error processing subscription:", error);
+    throw error;
   }
-  const userId = subscriptions[0].user_id;
-  await upsertSubscription(
-    {
-      userId,
-      stripeCustomerId: customerId,
-      stripeSubscriptionId: subscription.id,
-      status: subscription.status,
-      plan: subscription.status === "active" ? "premium" : "free",
-      currentPeriodStart: new Date(
-        subscription.current_period_start * 1e3
-      ).toISOString(),
-      currentPeriodEnd: new Date(
-        subscription.current_period_end * 1e3
-      ).toISOString(),
-      cancelAtPeriodEnd: subscription.cancel_at_period_end || false
-    },
-    env
-  );
 }
 __name(handleSubscriptionUpdate, "handleSubscriptionUpdate");
 async function handleSubscriptionDeleted(subscription, env) {
@@ -9633,6 +9725,13 @@ async function handleSubscriptionDeleted(subscription, env) {
 }
 __name(handleSubscriptionDeleted, "handleSubscriptionDeleted");
 async function upsertSubscription(data, env) {
+  console.log("[upsertSubscription] Attempting to upsert subscription:", {
+    userId: data.userId,
+    stripeCustomerId: data.stripeCustomerId,
+    stripeSubscriptionId: data.stripeSubscriptionId,
+    status: data.status,
+    plan: data.plan
+  });
   const response = await fetch(
     `${env.SUPABASE_URL}/rest/v1/subscriptions`,
     {
@@ -9657,10 +9756,21 @@ async function upsertSubscription(data, env) {
     }
   );
   if (!response.ok) {
-    const error = await response.text();
-    console.error("Failed to upsert subscription:", error);
-    throw new Error(`Failed to upsert subscription: ${error}`);
+    const errorText = await response.text();
+    console.error("[upsertSubscription] Failed to upsert subscription:", {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorText,
+      userId: data.userId
+    });
+    throw new Error(`Failed to upsert subscription: ${response.status} ${errorText}`);
   }
+  const result = await response.json();
+  console.log("[upsertSubscription] Successfully upserted subscription:", {
+    userId: data.userId,
+    subscriptionId: result[0]?.id || "unknown"
+  });
+  return result;
 }
 __name(upsertSubscription, "upsertSubscription");
 var onRequestPost3;
