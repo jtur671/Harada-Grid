@@ -29,6 +29,36 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const request = context.request;
   const env = context.env;
 
+  // Validate required environment variables
+  if (!env.SUPABASE_URL) {
+    console.error("[webhook] SUPABASE_URL is missing from environment variables");
+    console.error("[webhook] Available env keys:", Object.keys(env || {}));
+    return new Response(
+      JSON.stringify({ 
+        error: "Configuration error",
+        message: "SUPABASE_URL environment variable is not set. Please add it in Cloudflare Pages Settings → Variables and Secrets."
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[webhook] SUPABASE_SERVICE_ROLE_KEY is missing from environment variables");
+    return new Response(
+      JSON.stringify({ 
+        error: "Configuration error",
+        message: "SUPABASE_SERVICE_ROLE_KEY environment variable is not set. Please add it in Cloudflare Pages Settings → Variables and Secrets."
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
   // Initialize Stripe inside the handler (Cloudflare Workers don't have process.env)
   const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
     apiVersion: "2024-12-18.acacia",

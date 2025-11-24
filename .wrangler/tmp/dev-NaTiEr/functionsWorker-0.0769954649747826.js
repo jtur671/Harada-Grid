@@ -79,7 +79,7 @@ function checkURL2(request, init) {
 __name(checkURL2, "checkURL");
 var urls2;
 var init_checked_fetch = __esm({
-  "../.wrangler/tmp/bundle-OZr2dx/checked-fetch.js"() {
+  "../.wrangler/tmp/bundle-Uvb6ls/checked-fetch.js"() {
     urls2 = /* @__PURE__ */ new Set();
     __name2(checkURL2, "checkURL");
     globalThis.fetch = new Proxy(globalThis.fetch, {
@@ -9809,6 +9809,33 @@ var init_stripe_webhook = __esm({
     onRequestPost3 = /* @__PURE__ */ __name2(async (context) => {
       const request = context.request;
       const env = context.env;
+      if (!env.SUPABASE_URL) {
+        console.error("[webhook] SUPABASE_URL is missing from environment variables");
+        console.error("[webhook] Available env keys:", Object.keys(env || {}));
+        return new Response(
+          JSON.stringify({
+            error: "Configuration error",
+            message: "SUPABASE_URL environment variable is not set. Please add it in Cloudflare Pages Settings \u2192 Variables and Secrets."
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
+      if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.error("[webhook] SUPABASE_SERVICE_ROLE_KEY is missing from environment variables");
+        return new Response(
+          JSON.stringify({
+            error: "Configuration error",
+            message: "SUPABASE_SERVICE_ROLE_KEY environment variable is not set. Please add it in Cloudflare Pages Settings \u2192 Variables and Secrets."
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
       const stripe = new stripe_esm_worker_default(env.STRIPE_SECRET_KEY, {
         apiVersion: "2024-12-18.acacia"
       });
