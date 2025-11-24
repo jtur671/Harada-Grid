@@ -81,8 +81,24 @@ export const getSubscriptionStatus = async (
       data.current_period_end &&
       new Date(data.current_period_end) < new Date();
 
-    const plan: SubscriptionPlan =
-      isActive && !isExpired ? "premium" : "free";
+    // Use the plan from database if it exists, otherwise determine from status
+    // This ensures webhook-set plan values are respected
+    let plan: SubscriptionPlan;
+    if (data.plan === "premium" || data.plan === "free") {
+      // Use the plan from database (set by webhook)
+      plan = data.plan;
+      // But verify it matches the status
+      if (plan === "premium" && (!isActive || isExpired)) {
+        // Plan says premium but status says it's not active - trust the status
+        plan = "free";
+      } else if (plan === "free" && isActive && !isExpired) {
+        // Plan says free but status says active - trust the status
+        plan = "premium";
+      }
+    } else {
+      // Fallback: determine from status if plan field is missing/invalid
+      plan = isActive && !isExpired ? "premium" : "free";
+    }
 
     return {
       plan,

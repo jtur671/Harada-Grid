@@ -149,19 +149,37 @@ const App: React.FC = () => {
                 console.log("[Subscription] Dev mode: Keeping localStorage plan, ignoring database:", status.plan);
                 return;
               }
+              // Always use database status when available
+              console.log("[Subscription] Setting status from database:", status.plan);
               setSubscriptionStatus(status.plan);
             } else {
-              // Fallback to localStorage for development/testing or if table doesn't exist
-              // Don't overwrite if we already have a subscription status from a previous check
-              setSubscriptionStatus((prev) => prev || plan);
+              // No subscription found in database
+              // Only fallback to localStorage if we don't already have a premium status
+              // This prevents overwriting premium with free if there's a temporary query failure
+              setSubscriptionStatus((prev) => {
+                // If we already have premium, keep it (might be a temporary query issue)
+                if (prev === "premium") {
+                  console.log("[Subscription] Keeping existing premium status, ignoring null result");
+                  return prev;
+                }
+                // Otherwise fallback to localStorage
+                return prev || plan;
+              });
             }
           })
           .catch((err) => {
             if (cancelled) return;
             // Log the error for debugging
             console.warn("[Subscription] Failed to fetch subscription status:", err);
-            // Only fallback if we don't already have a status
-            setSubscriptionStatus((prev) => prev || plan);
+            // Don't overwrite premium status on error - might be temporary
+            setSubscriptionStatus((prev) => {
+              if (prev === "premium") {
+                console.log("[Subscription] Keeping existing premium status despite error");
+                return prev;
+              }
+              // Only fallback if we don't already have a status
+              return prev || plan;
+            });
           });
       }, 200); // Small delay to debounce
 
