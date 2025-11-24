@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
+import { supabase } from "../supabaseClient";
 import { getSubscriptionStatus } from "../services/subscriptions";
 import { AppHeader } from "./AppHeader";
 
@@ -21,59 +22,87 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
   isPro = false,
   onSetAuthView,
   onSetAppView,
+  onSetUser,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [subscriptionStatus, setSubscriptionStatus] = useState<"free" | "premium" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // SIMPLE: Wait for App.tsx to process OAuth tokens and set user
-  // App.tsx's onAuthStateChange will automatically process OAuth tokens from hash
+  // CRITICAL: Force Supabase to process OAuth tokens from hash
+  // Then wait for App.tsx to set the user
   useEffect(() => {
     if (!window.location.hash.startsWith("#success")) {
       return;
     }
 
-    console.log("[SuccessPage] Waiting for user session to be restored by App.tsx...");
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const hasOAuthTokens = hashParams.has("access_token");
     
-    // Wait for user to be set by App.tsx's onAuthStateChange
-    const checkUser = setInterval(() => {
-      if (user) {
-        console.log("[SuccessPage] ✅ User confirmed:", user.email);
-        clearInterval(checkUser);
-        setIsLoading(false);
+    const restoreSession = async () => {
+      if (hasOAuthTokens) {
+        console.log("[SuccessPage] OAuth tokens detected - forcing Supabase to process them...");
         
-        // Check subscription status
-        getSubscriptionStatus(user.id).then((status) => {
-          if (status) {
-            setSubscriptionStatus(status.plan);
+        // CRITICAL: Call getSession() to force Supabase to process OAuth tokens from hash
+        // This will trigger onAuthStateChange in App.tsx
+        for (let attempt = 0; attempt < 10; attempt++) {
+          console.log(`[SuccessPage] Attempt ${attempt + 1}: Checking session...`);
+          
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionData?.session?.user) {
+            console.log("[SuccessPage] ✅ Session found:", sessionData.session.user.email);
+            // Notify parent to update user state
+            if (onSetUser) {
+              onSetUser(sessionData.session.user);
+            }
+            setIsLoading(false);
+            
+            // Check subscription status
+            getSubscriptionStatus(sessionData.session.user.id).then((status) => {
+              if (status) {
+                setSubscriptionStatus(status.plan);
+              }
+            }).catch((err) => {
+              console.warn("[SuccessPage] Error checking subscription:", err);
+            });
+            
+            // Redirect to dashboard after 2 seconds
+            setTimeout(() => {
+              window.localStorage.removeItem("actionmaps-projects-cache");
+              window.localStorage.removeItem("actionmaps-last-view");
+              onSetAppView("dashboard");
+              window.history.replaceState(null, "", window.location.pathname);
+            }, 2000);
+            return;
+          } else {
+            console.warn(`[SuccessPage] No session (attempt ${attempt + 1}):`, sessionError?.message || "No session");
+            if (attempt < 9) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
           }
-        }).catch((err) => {
-          console.warn("[SuccessPage] Error checking subscription:", err);
-        });
+        }
         
-        // Redirect to dashboard after 2 seconds
-        setTimeout(() => {
-          window.localStorage.removeItem("actionmaps-projects-cache");
-          window.localStorage.removeItem("actionmaps-last-view");
-          onSetAppView("dashboard");
-          window.history.replaceState(null, "", window.location.pathname);
-        }, 2000);
+        // If we get here, session wasn't restored
+        console.error("[SuccessPage] ❌ Failed to restore session after all attempts");
+        setIsLoading(false);
+        setError("Session restoration failed. Please try logging in again.");
+      } else {
+        // No OAuth tokens - user should already be logged in
+        console.log("[SuccessPage] No OAuth tokens - user should already be logged in");
+        if (user) {
+          setIsLoading(false);
+          setTimeout(() => {
+            onSetAppView("dashboard");
+          }, 2000);
+        } else {
+          setIsLoading(false);
+          setError("Please log in to continue.");
+        }
       }
-    }, 500);
-
-    // Timeout after 10 seconds
-    const timeout = setTimeout(() => {
-      clearInterval(checkUser);
-      setIsLoading(false);
-      setError("Session restoration timed out. Please try logging in again.");
-      console.error("[SuccessPage] ❌ User session not restored after 10 seconds");
-    }, 10000);
-
-    return () => {
-      clearInterval(checkUser);
-      clearTimeout(timeout);
     };
-  }, [user, onSetAppView]);
+
+    restoreSession();
+  }, [onSetAppView, onSetUser]);
 
   return (
     <div className="app app-dark">
