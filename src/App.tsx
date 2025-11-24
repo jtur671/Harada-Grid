@@ -414,27 +414,46 @@ const App: React.FC = () => {
     // Check if we're coming back from OAuth (has tokens in URL hash, but not success)
     const hasOAuthTokens = !isSuccessHash && (hashParams.has("access_token") || hashParams.has("error"));
     
-    // If Stripe success, redirect to success page
-    if (isStripeSuccess || isSuccessHash) {
-      // Clean up URL - remove success params from both search and hash
-      const cleanParams = new URLSearchParams(urlParams);
-      cleanParams.delete("session_id");
-      cleanParams.delete("redirect_status");
-      const newSearch = cleanParams.toString();
-      const cleanHash = hashParams.has("access_token") ? window.location.hash : ""; // Keep OAuth tokens if present
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${cleanHash}`
-      );
-      setAppView("success");
-      return;
-    }
-    
+    // Load session first, then handle redirects
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       const current = data.session?.user ?? null;
       setUser(current);
+      
+      // If Stripe success, redirect to success page (but only after loading session)
+      if (isStripeSuccess || isSuccessHash) {
+        // Clean up URL - remove success params from both search and hash
+        const cleanParams = new URLSearchParams(urlParams);
+        cleanParams.delete("session_id");
+        cleanParams.delete("redirect_status");
+        const newSearch = cleanParams.toString();
+        const cleanHash = hashParams.has("access_token") ? window.location.hash : ""; // Keep OAuth tokens if present
+        window.history.replaceState(
+          null,
+          "",
+          `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${cleanHash}`
+        );
+        console.log("[Stripe] Detected successful return from checkout, redirecting to success page");
+        setAppView("success");
+        // Still load projects in background if user exists
+        if (current) {
+          setTimeout(() => {
+            if (!cancelled) {
+              getSubscriptionStatus(current.id).then((status) => {
+                if (status && !cancelled) {
+                  console.log("[Stripe] Subscription status after checkout:", status.plan);
+                  setSubscriptionStatus(status.plan);
+                }
+                if (!cancelled) {
+                  loadProjectsForUser(current, true);
+                }
+              });
+            }
+          }, 2000);
+        }
+        return;
+      }
+      
       if (current) {
         // On initial load (page refresh), always let loadProjects decide the view
         // This ensures logged-in users go to dashboard, not home

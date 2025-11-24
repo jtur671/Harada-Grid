@@ -63,37 +63,87 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
         }
 
         // Step 2: Ensure user session is active
-        // First check if we have OAuth tokens in hash (Stripe redirect might include them)
+        // Check if we have OAuth tokens in hash (Stripe redirect might include them)
         const hasOAuthTokens = hashParams.has("access_token");
         
         let currentUser = user;
-        if (!currentUser || hasOAuthTokens) {
-          console.log("[SuccessPage] No user in state or OAuth tokens detected, checking session...");
+        
+        // If we have a user already, use it (App.tsx should have loaded it)
+        if (currentUser) {
+          console.log("[SuccessPage] User already in state:", currentUser.email);
+        } else if (hasOAuthTokens) {
+          // OAuth tokens detected - wait for Supabase to process them
+          console.log("[SuccessPage] OAuth tokens detected, waiting for Supabase to process...");
+          await new Promise((resolve) => setTimeout(resolve, 1000));
           
-          // If OAuth tokens in hash, wait a moment for Supabase to process them
-          if (hasOAuthTokens) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }
-          
-          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-          if (sessionError) {
-            console.error("[SuccessPage] Error getting session:", sessionError);
-            setError("Failed to restore session. Please log in again.");
+          // Try to get session with timeout
+          try {
+            const sessionPromise = supabase.auth.getSession();
+            const timeoutPromise = new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error("Session check timeout")), 5000)
+            );
+            
+            const { data: sessionData, error: sessionError } = await Promise.race([
+              sessionPromise,
+              timeoutPromise,
+            ]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
+            
+            if (sessionError) {
+              console.error("[SuccessPage] Error getting session:", sessionError);
+              setError("Failed to restore session. Please log in again.");
+              setIsLoading(false);
+              return;
+            }
+            currentUser = sessionData.session?.user ?? null;
+            if (!currentUser) {
+              console.error("[SuccessPage] No session found after OAuth");
+              setError("No active session found. Please log in again.");
+              setIsLoading(false);
+              return;
+            }
+            console.log("[SuccessPage] Session restored for user:", currentUser.email);
+            if (onSetUser) {
+              onSetUser(currentUser);
+            }
+          } catch (err) {
+            console.error("[SuccessPage] Session check failed:", err);
+            setError("Unable to verify session. Please try logging in again.");
             setIsLoading(false);
             return;
           }
-          currentUser = sessionData.session?.user ?? null;
-          if (!currentUser) {
-            console.error("[SuccessPage] No session found");
-            setError("No active session found. Please log in again.");
-            setIsLoading(false);
-            return;
+        } else {
+          // No user and no OAuth tokens - try a quick session check
+          console.log("[SuccessPage] No user in state, checking session...");
+          try {
+            const { data: sessionData, error: sessionError } = await Promise.race([
+              supabase.auth.getSession(),
+              new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error("Session check timeout")), 3000)
+              ),
+            ]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
+            
+            if (!sessionError && sessionData?.session?.user) {
+              currentUser = sessionData.session.user;
+              console.log("[SuccessPage] Session found for user:", currentUser.email);
+              if (onSetUser) {
+                onSetUser(currentUser);
+              }
+            } else {
+              console.warn("[SuccessPage] No session found, but continuing anyway (user may be logged in via App.tsx)");
+              // Don't error out - App.tsx might be loading the user
+            }
+          } catch (err) {
+            console.warn("[SuccessPage] Session check failed, but continuing:", err);
+            // Don't error out - App.tsx might be loading the user
           }
-          console.log("[SuccessPage] Session restored for user:", currentUser.email);
-          // Update user state if callback provided
-          if (onSetUser) {
-            onSetUser(currentUser);
-          }
+        }
+        
+        // If still no user after all checks, show error
+        if (!currentUser) {
+          console.error("[SuccessPage] No user found after all checks");
+          setError("Please log in to continue.");
+          setIsLoading(false);
+          return;
         }
 
         // Step 3: Wait for webhook to process (give it 3 seconds)
@@ -102,17 +152,27 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
 
         // Step 4: Check subscription status
         if (!cancelled && currentUser) {
-          const status = await getSubscriptionStatus(currentUser.id);
-          if (status) {
-            console.log("[SuccessPage] Subscription status:", status.plan);
-            setSubscriptionStatus(status.plan);
-          } else {
-            console.warn("[SuccessPage] No subscription found yet, webhook may still be processing");
-            // Don't set error - webhook might still be processing
+          try {
+            const status = await Promise.race([
+              getSubscriptionStatus(currentUser.id),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+            ]);
+            if (status) {
+              console.log("[SuccessPage] Subscription status:", status.plan);
+              setSubscriptionStatus(status.plan);
+            } else {
+              console.warn("[SuccessPage] No subscription found yet, webhook may still be processing");
+              // Don't set error - webhook might still be processing
+            }
+          } catch (err) {
+            console.warn("[SuccessPage] Error checking subscription status:", err);
+            // Don't block on subscription check - webhook might still be processing
           }
         }
 
+        // Always set loading to false, even if subscription check fails
         setIsLoading(false);
+        console.log("[SuccessPage] Initialization complete, showing success message");
 
         // Step 5: Start countdown to redirect
         if (!cancelled) {
@@ -144,7 +204,7 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
         clearInterval(countdownInterval);
       }
     };
-  }, [user, onSetAppView]);
+  }, [user, onSetAppView, onSetUser]);
 
   return (
     <div className="app app-dark">
