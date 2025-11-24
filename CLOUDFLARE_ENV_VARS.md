@@ -63,3 +63,4 @@ After adding `SUPABASE_URL`:
 ❌ Missing variable:
 - `SUPABASE_URL` (server-side) ← **This is causing the error**
 
+

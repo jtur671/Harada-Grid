@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { HaradaState, AppView } from "../../types";
 import { createEmptyState } from "../../utils/harada";
+import { createStateFingerprint, hasMeaningfulContent } from "../../utils/stateFingerprint";
 
 /**
  * Tests for Auto-save logic
@@ -438,6 +439,62 @@ describe("Auto-save - Debounce Timing", () => {
     // This test documents the expected behavior
     await updatePromise;
     expect(mockUpdate).toHaveBeenCalled(); // In this test it still runs, but cleanup would prevent it
+  });
+});
+
+describe("State fingerprint helpers", () => {
+  it("treats diary-only entries as meaningful content", () => {
+    const blankState: HaradaState = {
+      goal: "",
+      pillars: Array.from({ length: 8 }, () => ""),
+      tasks: Array.from({ length: 8 }, () =>
+        Array.from({ length: 8 }, () => "")
+      ),
+      diaryByDate: {},
+      progressByDate: {},
+      completedDates: [],
+    };
+    expect(hasMeaningfulContent(blankState)).toBe(false);
+
+    const diaryState: HaradaState = {
+      ...blankState,
+      diaryByDate: {
+        ...blankState.diaryByDate,
+        "2025-11-24": "Morning reflection",
+      },
+    };
+
+    expect(hasMeaningfulContent(diaryState)).toBe(true);
+  });
+
+  it("changes fingerprint when diary entries change", () => {
+    const baseState = createEmptyState();
+    const baseFingerprint = createStateFingerprint(baseState);
+
+    const diaryState: HaradaState = {
+      ...baseState,
+      diaryByDate: {
+        ...baseState.diaryByDate,
+        "2025-11-24": "Morning reflection",
+      },
+    };
+
+    expect(createStateFingerprint(diaryState)).not.toEqual(baseFingerprint);
+  });
+
+  it("changes fingerprint when progress data changes", () => {
+    const baseState = createEmptyState();
+    const baseFingerprint = createStateFingerprint(baseState);
+
+    const progressState: HaradaState = {
+      ...baseState,
+      progressByDate: {
+        ...baseState.progressByDate,
+        "2025-11-24": ["0-0", "0-1"],
+      },
+    };
+
+    expect(createStateFingerprint(progressState)).not.toEqual(baseFingerprint);
   });
 });
 

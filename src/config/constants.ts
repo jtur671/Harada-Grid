@@ -12,5 +12,7 @@ export const PRO_PLAN_MAP_LIMIT = Infinity; // No limit for pro users
 export const PLAN_STORAGE_KEY = "actionmaps-plan";
 export const START_MODAL_DISMISSED_KEY = "actionmaps-start-modal-dismissed";
 export const LAST_VIEW_KEY = "actionmaps-last-view";
+export const PROJECTS_CACHE_KEY = "actionmaps-projects-cache";
+export const PROJECTS_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 

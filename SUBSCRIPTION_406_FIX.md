@@ -89,3 +89,4 @@ If the subscription record exists but the query still fails:
 3. Verify RLS policy allows users to read their own subscription
 4. Check Cloudflare Pages function logs for webhook processing errors
 
+

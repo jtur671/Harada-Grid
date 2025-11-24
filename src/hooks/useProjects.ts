@@ -1,9 +1,14 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../supabaseClient";
 import type { HaradaState, ProjectSummary, AppView, SubscriptionPlan } from "../types";
 import { getNextDefaultTitle } from "../utils/projects";
 import { FREE_PLAN_MAP_LIMIT } from "../config/constants";
+import {
+  getCachedProjects,
+  setCachedProjects,
+  clearCachedProjects,
+} from "../utils/storage";
 
 type UseProjectsOptions = {
   user: User | null;
@@ -27,9 +32,35 @@ export const useProjects = ({
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const loadingRef = useRef<boolean>(false);
   const loadTimeoutRef = useRef<number | null>(null);
+  const projectsRef = useRef<ProjectSummary[]>([]);
+  const hydratedRef = useRef<string | null>(null); // Track which user we've hydrated for
+  const loadProjectsRef = useRef<typeof loadProjects | null>(null);
+  const lastLoadTimeRef = useRef<number>(0); // Track when we last successfully loaded
+  
+  // Keep ref in sync with state and write to cache whenever projects change
+  useEffect(() => {
+    projectsRef.current = projects;
+    
+    // Auto-save to cache whenever projects list changes (if user is logged in)
+    if (user && projects.length > 0) {
+      setCachedProjects(user.id, projects);
+    }
+  }, [projects, user]);
 
   const loadProjects = useCallback(async (preserveView = false) => {
     if (!user) return;
+    
+    // CRITICAL: If we're viewing a project and not preserving view, never reload
+    // (it will interrupt the user and redirect them to dashboard)
+    if (currentProjectId && !preserveView) {
+      return; // Don't interrupt user's workflow
+    }
+    
+    // Aggressive guard: Don't load if we just loaded within the last 2 seconds
+    const timeSinceLastLoad = Date.now() - lastLoadTimeRef.current;
+    if (timeSinceLastLoad < 2000 && lastLoadTimeRef.current > 0) {
+      return; // Too soon, skip this call
+    }
     
     // Prevent concurrent requests, but allow retry after a delay if previous request failed
     if (loadingRef.current) {
@@ -62,27 +93,17 @@ export const useProjects = ({
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
 
-      console.log("[loadProjects] Database query result:", {
-        count: data?.length || 0,
-        error: error?.message || null,
-        projects: data?.map(p => ({
-          id: p.id,
-          title: p.title,
-          goal: (p.state as any)?.goal || null,
-          updated_at: p.updated_at,
-        })),
-      });
+      // Log only on errors or if count changed significantly
 
       if (error) {
         // Don't log network errors that might be temporary
         if (error.message?.includes("Failed to fetch") || error.message?.includes("ERR_INSUFFICIENT_RESOURCES")) {
-          console.warn("Network error loading projects (may be temporary):", error.message);
+          console.warn("[loadProjects] Network error (may be temporary):", error.message);
         } else {
-          console.error("Failed to load projects", error);
+          console.error("[loadProjects] ❌ Failed to load projects:", error);
         }
-        // Clear projects list on error so UI shows empty state
-        setProjects([]);
-        // Don't return - let finally block clear the loading flag
+        // On error, don't clear projects - keep cached ones if they exist
+        setProjects((prev) => prev.length > 0 ? prev : []);
         return;
       }
 
@@ -98,15 +119,31 @@ export const useProjects = ({
       };
     })) as ProjectSummary[];
 
-      setProjects(list);
+      setProjects((prev) => {
+        const prevMap = new Map(prev.map((p) => [p.id, p]));
+        const merged = list.map((proj) => prevMap.get(proj.id) ?? proj);
+        setCachedProjects(user.id, merged);
+        lastLoadTimeRef.current = Date.now(); // Mark successful load
+        return merged;
+      });
 
       // Only reset currentProjectId if we're not preserving the view
       if (!preserveView) {
         setCurrentProjectId(null);
       }
 
-      // Only change view if we're not preserving it
-      if (!preserveView && onViewChange) {
+      // Only change view if we're explicitly not preserving it AND not currently viewing a project
+      // NEVER change view if preserveView is true (user is working on something)
+      // NEVER change view if currentProjectId is set (user is viewing a project)
+      // NEVER change view if we just loaded projects very recently (user might be navigating)
+      // NEVER change view if we have projects (user has used the app - let them navigate manually)
+      const timeSinceLoad = Date.now() - lastLoadTimeRef.current;
+      const justLoaded = timeSinceLoad < 2000; // Within last 2 seconds
+      const hasProjects = list.length > 0;
+      
+      // Only auto-redirect if: not preserving view, no current project, didn't just load, AND no existing projects
+      // If user has projects, they know how to navigate - don't force redirects
+      if (!preserveView && onViewChange && !currentProjectId && !justLoaded && !hasProjects) {
         if (list.length === 0) {
           // Brand-new user: check if they have a subscription
           // If they just completed Stripe checkout, they should go to dashboard
@@ -136,15 +173,51 @@ export const useProjects = ({
         error.message.includes("Failed to fetch") || 
         error.message.includes("ERR_INSUFFICIENT_RESOURCES")
       )) {
-        console.warn("Network error loading projects (may be temporary):", error.message);
+        console.warn("[loadProjects] Network error (may be temporary):", error.message);
       } else {
-        console.error("Exception loading projects:", error);
+        console.error("[loadProjects] ❌ Exception loading projects:", error);
       }
+      // On exception, keep cached projects if they exist
+      setProjects((prev) => prev.length > 0 ? prev : []);
     } finally {
       clearTimeout(safetyTimeout);
       loadingRef.current = false;
     }
-  }, [user, plan, onViewChange, onViewModeChange, onStartModalChange]);
+  }, [user, plan, onViewChange, onViewModeChange, onStartModalChange, currentProjectId]);
+
+  // Store loadProjects in ref to avoid dependency issues
+  useEffect(() => {
+    loadProjectsRef.current = loadProjects;
+  }, [loadProjects]);
+
+  // Hydrate projects list from local cache for instant dashboard render
+  // Only runs once per user to avoid interfering with view changes
+  useEffect(() => {
+    if (!user) {
+      setProjects([]);
+      setCurrentProjectId(null);
+      clearCachedProjects();
+      hydratedRef.current = null;
+      return;
+    }
+
+    // Only hydrate once per user
+    if (hydratedRef.current === user.id) {
+      return;
+    }
+
+    hydratedRef.current = user.id;
+    const cached = getCachedProjects(user.id);
+    if (cached && cached.length > 0) {
+      setProjects(cached);
+    } else {
+      // No cache - load immediately from Supabase, but preserve current view
+      // Use ref to avoid dependency loop
+      if (loadProjectsRef.current) {
+        loadProjectsRef.current(true);
+      }
+    }
+  }, [user]); // Only depend on user, not loadProjects
 
   const createProject = async (
     state: HaradaState,

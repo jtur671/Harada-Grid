@@ -31,3 +31,4 @@ The webhook was setting `plan: "free"` when `status: "trialing"`. I've fixed the
 2. You should now see Pro status
 3. Future webhook events will set the plan correctly
 
+

@@ -104,3 +104,4 @@ SELECT * FROM subscriptions ORDER BY created_at DESC LIMIT 10;
 
 If empty, the webhook hasn't successfully created any records yet.
 
+

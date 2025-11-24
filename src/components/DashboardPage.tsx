@@ -168,19 +168,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
                     if (!error && data?.state) {
                       const loadedState = data.state as HaradaState;
-                      console.log("[Dashboard] Loading project state:", {
-                        projectId: p.id,
-                        hasState: !!data.state,
-                        goal: loadedState?.goal || "(no goal)",
-                        goalLength: loadedState?.goal?.length || 0,
-                        hasPillars: loadedState?.pillars?.length > 0,
-                        pillarsWithContent: loadedState?.pillars?.filter(p => p?.trim()).length || 0,
-                        hasTasks: loadedState?.tasks?.length > 0,
-                        tasksWithContent: loadedState?.tasks?.flat().filter(t => t?.trim()).length || 0,
-                        stateType: typeof data.state,
-                        stateIsObject: data.state && typeof data.state === 'object',
-                        stateKeys: data.state ? Object.keys(data.state) : [],
-                      });
                       // Set project ID FIRST to prevent autosave from saving to wrong project
                       onSetCurrentProjectId(p.id);
                       // Set state immediately - the loaded state should override any localStorage state

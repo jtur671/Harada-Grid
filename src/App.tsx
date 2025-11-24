@@ -14,6 +14,7 @@ import { useDateSync } from "./hooks/useDateSync";
 import { useProjects } from "./hooks/useProjects";
 import { getInitialPlan, hasDismissedStartModal, setStartModalDismissed, setPlan as savePlanToStorage, getLastView, setLastView } from "./utils/storage";
 import { buildExampleState } from "./utils/projects";
+import { createStateFingerprint, hasMeaningfulContent } from "./utils/stateFingerprint";
 import { generateAiMap, refinePillar, applyAiResponseToState } from "./services/ai";
 import { getSubscriptionStatus } from "./services/subscriptions";
 import { FREE_PLAN_MAP_LIMIT, PRO_PLAN_MAP_LIMIT } from "./config/constants";
@@ -74,6 +75,8 @@ const App: React.FC = () => {
   const lastSavedStateRef = useRef<string>("");
   const justLoadedProjectRef = useRef<boolean>(false);
   const autosaveTimeoutRef = useRef<number | null>(null); // Store timeout ID in ref
+  const authHandlerTimeoutRef = useRef<number | null>(null); // Track auth handler timeout
+  const autosaveLoggedRef = useRef<boolean>(false);
 
   const isLoggedIn = !!user;
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
@@ -292,6 +295,13 @@ const App: React.FC = () => {
     }
   }, [appView]);
 
+  // Reset autosave log state whenever user leaves builder or logs out
+  useEffect(() => {
+    if (appView !== "builder" || !isLoggedIn) {
+      autosaveLoggedRef.current = false;
+    }
+  }, [appView, isLoggedIn]);
+
   // Detect if we just returned from Stripe checkout (success URL adds session params)
   useEffect(() => {
     const successStatuses = new Set(["success", "complete"]);
@@ -428,14 +438,11 @@ const App: React.FC = () => {
             }
           }, 2000); // Give webhook 2 seconds to process
         } else {
-          setTimeout(() => {
-            if (!cancelled) {
-              // On refresh, always let loadProjects set the appropriate view
-              // (dashboard if has projects or subscription, pricing if no plan, etc.)
-              // Don't preserve view - let it decide based on user's projects and subscription
-              loadProjectsForUser(current, false);
-            }
-          }, 100);
+          // Load projects immediately - no delay needed
+          // useProjects will hydrate from cache instantly, and this will refresh from Supabase
+          if (!cancelled) {
+            loadProjectsForUser(current, false);
+          }
         }
       } else {
         // Only set to home if not logged in AND not already in a logged-out view
@@ -474,8 +481,19 @@ const App: React.FC = () => {
           const isOAuthCallback = hashParams.has("access_token");
           
           setAppView((currentView) => {
+            // Clear any pending timeout
+            if (authHandlerTimeoutRef.current !== null) {
+              clearTimeout(authHandlerTimeoutRef.current);
+            }
+            
+            // Skip if we're in builder view with a project open - don't interrupt the user
+            if (currentView === "builder" && currentProjectId) {
+              return currentView;
+            }
+            
             // Debounce project loading to avoid rapid calls
-            setTimeout(() => {
+            authHandlerTimeoutRef.current = window.setTimeout(() => {
+              authHandlerTimeoutRef.current = null;
               // If coming back from OAuth, always redirect (even if auth is initialized)
               // This handles the case where user completes Stripe checkout
               if (isOAuthCallback) {
@@ -561,30 +579,23 @@ const App: React.FC = () => {
       return;
     }
 
-    // Only save if state has actual content
-    const hasContent = state.goal?.trim() || 
-      state.pillars.some(p => p?.trim()) || 
-      state.tasks.some(row => row.some(t => t?.trim()));
-
-    if (!hasContent) {
+    // Only save if state has actual content (including diary/progress data)
+    if (!hasMeaningfulContent(state)) {
       return;
     }
 
     // Create fingerprint to detect changes
-    const stateFingerprint = JSON.stringify({
-      goal: state.goal,
-      pillars: state.pillars,
-      tasks: state.tasks,
-    });
+    const stateFingerprint = createStateFingerprint(state);
 
     // Skip if already saved
     if (lastSavedStateRef.current === stateFingerprint) {
       return;
     }
 
-    // Log once when autosave starts
-    if (lastSavedStateRef.current === "") {
-      console.log("[autosave] on:");
+    // Log once when autosave is active
+    if (!autosaveLoggedRef.current) {
+      console.log("[autosave] on");
+      autosaveLoggedRef.current = true;
     }
 
     // Clear any existing timeout
@@ -598,7 +609,6 @@ const App: React.FC = () => {
     const userIdToSave = user.id;
     
     // Set timeout - this will execute after 800ms of no changes
-    console.log("[autosave] ⏱️ Setting timeout, will save in 800ms if no more changes");
     autosaveTimeoutRef.current = window.setTimeout(async () => {
       autosaveTimeoutRef.current = null;
       console.log("[autosave] ⏰ Timeout executed! Saving now...");
@@ -629,11 +639,7 @@ const App: React.FC = () => {
             updated_at: now,
           });
           
-          lastSavedStateRef.current = JSON.stringify({
-            goal: stateToSave.goal,
-            pillars: stateToSave.pillars,
-            tasks: stateToSave.tasks,
-          });
+          lastSavedStateRef.current = createStateFingerprint(stateToSave);
         }
       } catch (e) {
         console.error("[autosave] ❌ Exception:", e);
