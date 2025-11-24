@@ -79,7 +79,7 @@ function checkURL2(request, init) {
 __name(checkURL2, "checkURL");
 var urls2;
 var init_checked_fetch = __esm({
-  "../.wrangler/tmp/bundle-Uvb6ls/checked-fetch.js"() {
+  "../.wrangler/tmp/bundle-vlhugM/checked-fetch.js"() {
     urls2 = /* @__PURE__ */ new Set();
     __name2(checkURL2, "checkURL");
     globalThis.fetch = new Proxy(globalThis.fetch, {
@@ -9579,6 +9579,14 @@ async function handleCheckoutCompleted(session, env, stripe) {
       userId,
       email: customerEmail
     });
+    const currentPeriodStart = subscription.current_period_start ? new Date(subscription.current_period_start * 1e3).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
+    const currentPeriodEnd = subscription.current_period_end ? new Date(subscription.current_period_end * 1e3).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString();
+    console.log("[handleCheckoutCompleted] Date conversion:", {
+      current_period_start: subscription.current_period_start,
+      current_period_end: subscription.current_period_end,
+      convertedStart: currentPeriodStart,
+      convertedEnd: currentPeriodEnd
+    });
     await upsertSubscription(
       {
         userId,
@@ -9586,12 +9594,8 @@ async function handleCheckoutCompleted(session, env, stripe) {
         stripeSubscriptionId: subscriptionId,
         status: subscription.status,
         plan: "premium",
-        currentPeriodStart: new Date(
-          subscription.current_period_start * 1e3
-        ).toISOString(),
-        currentPeriodEnd: new Date(
-          subscription.current_period_end * 1e3
-        ).toISOString(),
+        currentPeriodStart,
+        currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end || false
       },
       env
@@ -9676,6 +9680,14 @@ async function handleSubscriptionUpdate(subscription, env, stripe) {
       console.error("[handleSubscriptionUpdate] Could not determine user_id");
       return;
     }
+    const currentPeriodStart = subscription.current_period_start ? new Date(subscription.current_period_start * 1e3).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
+    const currentPeriodEnd = subscription.current_period_end ? new Date(subscription.current_period_end * 1e3).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString();
+    console.log("[handleSubscriptionUpdate] Date conversion:", {
+      current_period_start: subscription.current_period_start,
+      current_period_end: subscription.current_period_end,
+      convertedStart: currentPeriodStart,
+      convertedEnd: currentPeriodEnd
+    });
     await upsertSubscription(
       {
         userId,
@@ -9683,12 +9695,8 @@ async function handleSubscriptionUpdate(subscription, env, stripe) {
         stripeSubscriptionId: subscription.id,
         status: subscription.status,
         plan: subscription.status === "active" ? "premium" : "free",
-        currentPeriodStart: new Date(
-          subscription.current_period_start * 1e3
-        ).toISOString(),
-        currentPeriodEnd: new Date(
-          subscription.current_period_end * 1e3
-        ).toISOString(),
+        currentPeriodStart,
+        currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end || false
       },
       env
@@ -9734,14 +9742,24 @@ async function upsertSubscription(data, env) {
     supabaseUrl: env.SUPABASE_URL ? `${env.SUPABASE_URL.substring(0, 20)}...` : "MISSING",
     hasServiceKey: !!env.SUPABASE_SERVICE_ROLE_KEY
   });
+  const validateDate = /* @__PURE__ */ __name2((dateStr, fieldName) => {
+    if (!dateStr) {
+      throw new Error(`${fieldName} is required`);
+    }
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      throw new Error(`${fieldName} is not a valid date: ${dateStr}`);
+    }
+    return date.toISOString();
+  }, "validateDate");
   const payload = {
     user_id: data.userId,
     stripe_customer_id: data.stripeCustomerId,
     stripe_subscription_id: data.stripeSubscriptionId,
     status: data.status,
     plan: data.plan,
-    current_period_start: data.currentPeriodStart,
-    current_period_end: data.currentPeriodEnd,
+    current_period_start: validateDate(data.currentPeriodStart, "currentPeriodStart"),
+    current_period_end: validateDate(data.currentPeriodEnd, "currentPeriodEnd"),
     cancel_at_period_end: data.cancelAtPeriodEnd,
     updated_at: (/* @__PURE__ */ new Date()).toISOString()
   };

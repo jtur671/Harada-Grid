@@ -220,6 +220,22 @@ async function handleCheckoutCompleted(
       email: customerEmail,
     });
 
+    // Convert Stripe timestamps to ISO strings (Stripe uses Unix timestamps in seconds)
+    const currentPeriodStart = subscription.current_period_start
+      ? new Date(subscription.current_period_start * 1000).toISOString()
+      : new Date().toISOString();
+    
+    const currentPeriodEnd = subscription.current_period_end
+      ? new Date(subscription.current_period_end * 1000).toISOString()
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // Default to 30 days from now
+
+    console.log("[handleCheckoutCompleted] Date conversion:", {
+      current_period_start: subscription.current_period_start,
+      current_period_end: subscription.current_period_end,
+      convertedStart: currentPeriodStart,
+      convertedEnd: currentPeriodEnd,
+    });
+
     // Upsert subscription record
     await upsertSubscription(
       {
@@ -228,12 +244,8 @@ async function handleCheckoutCompleted(
         stripeSubscriptionId: subscriptionId,
         status: subscription.status,
         plan: "premium",
-        currentPeriodStart: new Date(
-          subscription.current_period_start * 1000
-        ).toISOString(),
-        currentPeriodEnd: new Date(
-          subscription.current_period_end * 1000
-        ).toISOString(),
+        currentPeriodStart,
+        currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
       },
       env
@@ -347,6 +359,22 @@ async function handleSubscriptionUpdate(
       return;
     }
 
+    // Convert Stripe timestamps to ISO strings (Stripe uses Unix timestamps in seconds)
+    const currentPeriodStart = subscription.current_period_start
+      ? new Date(subscription.current_period_start * 1000).toISOString()
+      : new Date().toISOString();
+    
+    const currentPeriodEnd = subscription.current_period_end
+      ? new Date(subscription.current_period_end * 1000).toISOString()
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // Default to 30 days from now
+
+    console.log("[handleSubscriptionUpdate] Date conversion:", {
+      current_period_start: subscription.current_period_start,
+      current_period_end: subscription.current_period_end,
+      convertedStart: currentPeriodStart,
+      convertedEnd: currentPeriodEnd,
+    });
+
     // Upsert subscription record
     await upsertSubscription(
       {
@@ -355,12 +383,8 @@ async function handleSubscriptionUpdate(
         stripeSubscriptionId: subscription.id,
         status: subscription.status,
         plan: subscription.status === "active" ? "premium" : "free",
-        currentPeriodStart: new Date(
-          subscription.current_period_start * 1000
-        ).toISOString(),
-        currentPeriodEnd: new Date(
-          subscription.current_period_end * 1000
-        ).toISOString(),
+        currentPeriodStart,
+        currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
       },
       env
@@ -432,14 +456,26 @@ async function upsertSubscription(
     hasServiceKey: !!env.SUPABASE_SERVICE_ROLE_KEY,
   });
 
+  // Validate dates are valid ISO strings
+  const validateDate = (dateStr: string, fieldName: string): string => {
+    if (!dateStr) {
+      throw new Error(`${fieldName} is required`);
+    }
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      throw new Error(`${fieldName} is not a valid date: ${dateStr}`);
+    }
+    return date.toISOString();
+  };
+
   const payload = {
     user_id: data.userId,
     stripe_customer_id: data.stripeCustomerId,
     stripe_subscription_id: data.stripeSubscriptionId,
     status: data.status,
     plan: data.plan,
-    current_period_start: data.currentPeriodStart,
-    current_period_end: data.currentPeriodEnd,
+    current_period_start: validateDate(data.currentPeriodStart, "currentPeriodStart"),
+    current_period_end: validateDate(data.currentPeriodEnd, "currentPeriodEnd"),
     cancel_at_period_end: data.cancelAtPeriodEnd,
     updated_at: new Date().toISOString(),
   };

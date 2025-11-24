@@ -32,7 +32,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../.wrangler/tmp/bundle-Uvb6ls/checked-fetch.js
+// ../.wrangler/tmp/bundle-vlhugM/checked-fetch.js
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
     (typeof request === "string" ? new Request(request, init) : request).url
@@ -50,7 +50,7 @@ function checkURL(request, init) {
 }
 var urls;
 var init_checked_fetch = __esm({
-  "../.wrangler/tmp/bundle-Uvb6ls/checked-fetch.js"() {
+  "../.wrangler/tmp/bundle-vlhugM/checked-fetch.js"() {
     urls = /* @__PURE__ */ new Set();
     __name(checkURL, "checkURL");
     globalThis.fetch = new Proxy(globalThis.fetch, {
@@ -9591,6 +9591,14 @@ async function handleCheckoutCompleted(session, env, stripe) {
       userId,
       email: customerEmail
     });
+    const currentPeriodStart = subscription.current_period_start ? new Date(subscription.current_period_start * 1e3).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
+    const currentPeriodEnd = subscription.current_period_end ? new Date(subscription.current_period_end * 1e3).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString();
+    console.log("[handleCheckoutCompleted] Date conversion:", {
+      current_period_start: subscription.current_period_start,
+      current_period_end: subscription.current_period_end,
+      convertedStart: currentPeriodStart,
+      convertedEnd: currentPeriodEnd
+    });
     await upsertSubscription(
       {
         userId,
@@ -9598,12 +9606,8 @@ async function handleCheckoutCompleted(session, env, stripe) {
         stripeSubscriptionId: subscriptionId,
         status: subscription.status,
         plan: "premium",
-        currentPeriodStart: new Date(
-          subscription.current_period_start * 1e3
-        ).toISOString(),
-        currentPeriodEnd: new Date(
-          subscription.current_period_end * 1e3
-        ).toISOString(),
+        currentPeriodStart,
+        currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end || false
       },
       env
@@ -9687,6 +9691,14 @@ async function handleSubscriptionUpdate(subscription, env, stripe) {
       console.error("[handleSubscriptionUpdate] Could not determine user_id");
       return;
     }
+    const currentPeriodStart = subscription.current_period_start ? new Date(subscription.current_period_start * 1e3).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
+    const currentPeriodEnd = subscription.current_period_end ? new Date(subscription.current_period_end * 1e3).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString();
+    console.log("[handleSubscriptionUpdate] Date conversion:", {
+      current_period_start: subscription.current_period_start,
+      current_period_end: subscription.current_period_end,
+      convertedStart: currentPeriodStart,
+      convertedEnd: currentPeriodEnd
+    });
     await upsertSubscription(
       {
         userId,
@@ -9694,12 +9706,8 @@ async function handleSubscriptionUpdate(subscription, env, stripe) {
         stripeSubscriptionId: subscription.id,
         status: subscription.status,
         plan: subscription.status === "active" ? "premium" : "free",
-        currentPeriodStart: new Date(
-          subscription.current_period_start * 1e3
-        ).toISOString(),
-        currentPeriodEnd: new Date(
-          subscription.current_period_end * 1e3
-        ).toISOString(),
+        currentPeriodStart,
+        currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end || false
       },
       env
@@ -9743,14 +9751,24 @@ async function upsertSubscription(data, env) {
     supabaseUrl: env.SUPABASE_URL ? `${env.SUPABASE_URL.substring(0, 20)}...` : "MISSING",
     hasServiceKey: !!env.SUPABASE_SERVICE_ROLE_KEY
   });
+  const validateDate = /* @__PURE__ */ __name((dateStr, fieldName) => {
+    if (!dateStr) {
+      throw new Error(`${fieldName} is required`);
+    }
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      throw new Error(`${fieldName} is not a valid date: ${dateStr}`);
+    }
+    return date.toISOString();
+  }, "validateDate");
   const payload = {
     user_id: data.userId,
     stripe_customer_id: data.stripeCustomerId,
     stripe_subscription_id: data.stripeSubscriptionId,
     status: data.status,
     plan: data.plan,
-    current_period_start: data.currentPeriodStart,
-    current_period_end: data.currentPeriodEnd,
+    current_period_start: validateDate(data.currentPeriodStart, "currentPeriodStart"),
+    current_period_end: validateDate(data.currentPeriodEnd, "currentPeriodEnd"),
     cancel_at_period_end: data.cancelAtPeriodEnd,
     updated_at: (/* @__PURE__ */ new Date()).toISOString()
   };
@@ -9964,11 +9982,11 @@ var init_functionsRoutes_0_34990220434492625 = __esm({
   }
 });
 
-// ../.wrangler/tmp/bundle-Uvb6ls/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-vlhugM/middleware-loader.entry.ts
 init_functionsRoutes_0_34990220434492625();
 init_checked_fetch();
 
-// ../.wrangler/tmp/bundle-Uvb6ls/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-vlhugM/middleware-insertion-facade.js
 init_functionsRoutes_0_34990220434492625();
 init_checked_fetch();
 
@@ -10469,7 +10487,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-Uvb6ls/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-vlhugM/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -10503,7 +10521,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-Uvb6ls/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-vlhugM/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
