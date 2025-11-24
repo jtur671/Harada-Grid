@@ -144,28 +144,43 @@ export const useProjects = ({
       
       // Only auto-redirect if: not preserving view, no current project, didn't just load, AND no existing projects
       // If user has projects, they know how to navigate - don't force redirects
+      // NEVER redirect if user is already on pricing page - they might be trying to upgrade
       if (!preserveView && onViewChange && !currentProjectId && !justLoaded && !hasProjects) {
+        // Check current view - don't redirect if already on pricing
+        const currentView = typeof window !== "undefined" ? 
+          (window.localStorage.getItem("actionmaps-last-view") || "home") : "home";
+        
         if (list.length === 0) {
           // Brand-new user: check if they have a subscription
           // If they just completed Stripe checkout, they should go to dashboard
           if (isPro) {
             // User has Pro subscription (from database) - send to dashboard
             // They can create their first map from there
-            onViewChange("dashboard");
-            if (onStartModalChange) onStartModalChange(false);
+            if (currentView !== "pricing") {
+              onViewChange("dashboard");
+              if (onStartModalChange) onStartModalChange(false);
+            }
           } else if (!plan) {
             // No subscription and no localStorage plan - send to pricing
-            onViewChange("pricing");
-            if (onStartModalChange) onStartModalChange(false);
+            // But only if not already on pricing page
+            if (currentView !== "pricing") {
+              onViewChange("pricing");
+              if (onStartModalChange) onStartModalChange(false);
+            }
           } else {
             // Has localStorage plan but not Pro - go to builder
-            onViewChange("builder");
-            if (onViewModeChange) onViewModeChange("grid");
+            // But only if not already on pricing page
+            if (currentView !== "pricing") {
+              onViewChange("builder");
+              if (onViewModeChange) onViewModeChange("grid");
+            }
           }
         } else {
-          // Returning user: land on dashboard
-          onViewChange("dashboard");
-          if (onStartModalChange) onStartModalChange(false);
+          // Returning user: land on dashboard (but not if on pricing)
+          if (currentView !== "pricing") {
+            onViewChange("dashboard");
+            if (onStartModalChange) onStartModalChange(false);
+          }
         }
       }
     } catch (error) {

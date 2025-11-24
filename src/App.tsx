@@ -270,7 +270,11 @@ const App: React.FC = () => {
       // Mark that we just loaded a project to prevent autosave from overwriting it
       justLoadedProjectRef.current = true;
       setState(projectState);
-      setViewMode("grid");
+      // Only set viewMode to grid if we're not already in builder with this project
+      // This preserves the user's view mode preference when switching between projects
+      if (currentProjectId !== projectId || appView !== "builder") {
+        setViewMode("grid");
+      }
       setStartModalOpen(false);
       setAppView("builder");
       // Clear the flag after 2 seconds

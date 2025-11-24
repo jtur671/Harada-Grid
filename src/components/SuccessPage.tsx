@@ -130,36 +130,42 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
             }
           }
           
-          // If still no user, show error
+          // If still no user, don't block - allow user to continue anyway
+          // The subscription check will happen in the background if user is found later
           if (!currentUser) {
-            console.error("[SuccessPage] No user found after all attempts");
-            setError("Unable to verify your session. Please try logging in again.");
-            setIsLoading(false);
-            return;
+            console.warn("[SuccessPage] No user found after all attempts, but allowing user to continue");
+            // Don't set error - just continue without user verification
+            // The user can still proceed to dashboard
           }
         }
 
-        // Step 3: Wait for webhook to process (give it 3 seconds)
+        // Step 3: Wait for webhook to process (give it 2 seconds)
         console.log("[SuccessPage] Waiting for webhook to process subscription...");
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        // Step 4: Check subscription status
-        if (!cancelled && currentUser) {
-          try {
-            const status = await Promise.race([
-              getSubscriptionStatus(currentUser.id),
-              new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
-            ]);
-            if (status) {
-              console.log("[SuccessPage] Subscription status:", status.plan);
-              setSubscriptionStatus(status.plan);
-            } else {
-              console.warn("[SuccessPage] No subscription found yet, webhook may still be processing");
-              // Don't set error - webhook might still be processing
+        // Step 4: Check subscription status (don't block if no user)
+        if (!cancelled) {
+          // Check subscription even if no user found (might be in database)
+          const userIdToCheck = currentUser?.id;
+          if (userIdToCheck) {
+            try {
+              const status = await Promise.race([
+                getSubscriptionStatus(userIdToCheck),
+                new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+              ]);
+              if (status) {
+                console.log("[SuccessPage] Subscription status:", status.plan);
+                setSubscriptionStatus(status.plan);
+              } else {
+                console.warn("[SuccessPage] No subscription found yet, webhook may still be processing");
+                // Don't set error - webhook might still be processing
+              }
+            } catch (err) {
+              console.warn("[SuccessPage] Error checking subscription status:", err);
+              // Don't block on subscription check - webhook might still be processing
             }
-          } catch (err) {
-            console.warn("[SuccessPage] Error checking subscription status:", err);
-            // Don't block on subscription check - webhook might still be processing
+          } else {
+            console.warn("[SuccessPage] No user ID available for subscription check");
           }
         }
 
@@ -218,9 +224,22 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
             {isLoading ? (
               <div style={{ textAlign: "center" }}>
                 <h1 style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>Processing your upgrade...</h1>
-                <p style={{ fontSize: "1.125rem", color: "#888" }}>
+                <p style={{ fontSize: "1.125rem", color: "#888", marginBottom: "2rem" }}>
                   Please wait while we confirm your subscription.
                 </p>
+                <button
+                  type="button"
+                  className="hero-primary-cta"
+                  onClick={() => {
+                    // Allow user to skip waiting and go to dashboard
+                    console.log("[SuccessPage] User clicked to skip waiting");
+                    setIsLoading(false);
+                    onSetAppView("dashboard");
+                  }}
+                  style={{ marginTop: "1rem" }}
+                >
+                  Continue to Dashboard
+                </button>
               </div>
             ) : error ? (
               <div style={{ textAlign: "center" }}>
