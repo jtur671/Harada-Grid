@@ -108,16 +108,21 @@ export const useProjects = ({
       // Only change view if we're not preserving it
       if (!preserveView && onViewChange) {
         if (list.length === 0) {
-          // Brand-new user: send them to pricing first
-          if (!plan) {
+          // Brand-new user: check if they have a subscription
+          // If they just completed Stripe checkout, they should go to dashboard
+          if (isPro) {
+            // User has Pro subscription (from database) - send to dashboard
+            // They can create their first map from there
+            onViewChange("dashboard");
+            if (onStartModalChange) onStartModalChange(false);
+          } else if (!plan) {
+            // No subscription and no localStorage plan - send to pricing
             onViewChange("pricing");
             if (onStartModalChange) onStartModalChange(false);
           } else {
-            // If they already chose a plan on this device, go straight to builder
+            // Has localStorage plan but not Pro - go to builder
             onViewChange("builder");
             if (onViewModeChange) onViewModeChange("grid");
-            // Only show start modal if they haven't dismissed it before
-            // This would need to be passed in or checked here
           }
         } else {
           // Returning user: land on dashboard

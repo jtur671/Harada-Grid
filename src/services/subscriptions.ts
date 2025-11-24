@@ -26,36 +26,48 @@ export const getSubscriptionStatus = async (
       .from("subscriptions")
       .select("plan, status, cancel_at_period_end, current_period_end")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle(); // Use maybeSingle() instead of single() - returns null if no row found instead of error
 
     if (error) {
-      // If subscription not found, user is on free plan
-      if (error.code === "PGRST116") {
-        return {
-          plan: "free",
-          status: "free",
-          cancelAtPeriodEnd: false,
-          currentPeriodEnd: null,
-        };
-      }
-      
       // If table doesn't exist yet (PGRST205), return null to use localStorage fallback
       if (error.code === "PGRST205") {
         console.log("[Subscription] Table not found - using localStorage fallback. Run SQL migration to enable database subscriptions.");
         return null;
       }
       
-      // Handle 406 Not Acceptable (might be RLS issue or table structure mismatch)
-      if (error.message?.includes("406") || error.message?.includes("Not Acceptable")) {
-        console.warn("[Subscription] 406 error - table may not be set up correctly. Using localStorage fallback.");
+      // Handle 406 Not Acceptable (RLS issue or Accept header mismatch)
+      // This can happen if:
+      // 1. RLS policy is blocking the request
+      // 2. The subscription record doesn't exist yet (webhook hasn't run)
+      // 3. Accept header mismatch
+      if (error.code === "PGRST406" || error.message?.includes("406") || error.message?.includes("Not Acceptable")) {
+        console.warn("[Subscription] 406 error - Possible causes:", {
+          code: error.code,
+          message: error.message,
+          hint: "Check: 1) RLS policies allow SELECT, 2) Subscription record exists, 3) Webhook has run after Stripe checkout"
+        });
+        // Return null to fall back to localStorage - user might need to refresh after webhook processes
         return null;
       }
       
-      // Only log non-critical errors
-      if (error.code !== "PGRST116") {
-        console.error("[Subscription] Error fetching subscription:", error);
-      }
+      // Log other errors
+      console.error("[Subscription] Error fetching subscription:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
       return null;
+    }
+
+    // If no data (subscription not found), user is on free plan
+    if (!data) {
+      return {
+        plan: "free",
+        status: "free",
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
+      };
     }
 
     // Check if subscription is actually active

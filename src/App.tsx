@@ -265,6 +265,10 @@ const App: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     
+    // Check if we're coming back from OAuth (has tokens in URL hash)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const hasOAuthTokens = hashParams.has("access_token") || hashParams.has("error");
+    
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       const current = data.session?.user ?? null;
@@ -272,11 +276,16 @@ const App: React.FC = () => {
       if (current) {
         // On initial load (page refresh), always let loadProjects decide the view
         // This ensures logged-in users go to dashboard, not home
+        // If coming back from OAuth (Stripe checkout), clear hash and let loadProjects redirect
+        if (hasOAuthTokens) {
+          // Clear the hash to clean up the URL
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
         setTimeout(() => {
           if (!cancelled) {
             // On refresh, always let loadProjects set the appropriate view
-            // (dashboard if has projects, pricing if no plan, etc.)
-            // Don't preserve view - let it decide based on user's projects
+            // (dashboard if has projects or subscription, pricing if no plan, etc.)
+            // Don't preserve view - let it decide based on user's projects and subscription
             loadProjectsForUser(current, false);
           }
         }, 100);
@@ -328,7 +337,16 @@ const App: React.FC = () => {
                 loadProjectsForUser(u, true);
               } else if (event === "SIGNED_IN" && userChanged) {
                 // Only on actual sign in with user change (and only before initialization)
-                if (currentView === "home") {
+                // If coming back from OAuth (e.g., Stripe checkout), always redirect to let loadProjects decide
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const isOAuthCallback = hashParams.has("access_token");
+                
+                if (isOAuthCallback) {
+                  // Clear the hash to clean up the URL
+                  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+                  // Let loadProjects decide where to go (dashboard if has subscription, etc.)
+                  loadProjectsForUser(u, false);
+                } else if (currentView === "home") {
                   // Only redirect from home, preserve all other views
                   loadProjectsForUser(u, false);
                 } else {
