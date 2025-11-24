@@ -43,22 +43,61 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
         const hardReloadKey = "stripe-oauth-processed";
         const hasProcessedOAuth = sessionStorage.getItem(hardReloadKey);
         
-        // REMOVED: Hard reload logic - it was causing the page to get stuck
-        // Instead, let Supabase process OAuth tokens normally via onAuthStateChange
+        // CRITICAL: Force Supabase to process OAuth tokens from hash
         if (hasOAuthTokens) {
-          console.log("[SuccessPage] OAuth tokens detected, waiting for Supabase to process...");
-          // Wait for Supabase to process OAuth tokens
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          console.log("[SuccessPage] OAuth tokens detected in hash, forcing session restoration...");
           
-          // Check for session
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData?.session?.user) {
-            console.log("[SuccessPage] ✅ Session found:", sessionData.session.user.email);
-            if (onSetUser) {
-              onSetUser(sessionData.session.user);
+          // Get the saved user info from before Stripe checkout
+          const savedUserInfo = sessionStorage.getItem("stripe-checkout-user");
+          console.log("[SuccessPage] Saved user info before checkout:", savedUserInfo);
+          
+          // Force Supabase to process the OAuth tokens by calling getSession
+          // This should trigger the auth state change
+          let sessionRestored = false;
+          for (let attempt = 0; attempt < 5; attempt++) {
+            console.log(`[SuccessPage] Attempting to restore session (attempt ${attempt + 1}/5)...`);
+            
+            // Wait a bit for Supabase to process
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            
+            // Check for session
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionData?.session?.user) {
+              console.log("[SuccessPage] ✅ Session restored successfully:", sessionData.session.user.email);
+              sessionRestored = true;
+              
+              // CRITICAL: Update parent component
+              if (onSetUser) {
+                onSetUser(sessionData.session.user);
+                console.log("[SuccessPage] User state updated in parent");
+              }
+              
+              // Clear saved user info
+              sessionStorage.removeItem("stripe-checkout-user");
+              break;
+            } else {
+              console.warn(`[SuccessPage] No session found (attempt ${attempt + 1}):`, sessionError?.message || "No session");
+              
+              // On last attempt, force a hard reload with OAuth tokens preserved
+              if (attempt === 4) {
+                console.log("[SuccessPage] Last attempt failed, forcing hard reload with OAuth tokens...");
+                // Preserve the hash with OAuth tokens
+                const currentHash = window.location.hash;
+                // Clear caches but preserve hash
+                window.localStorage.removeItem("actionmaps-projects-cache");
+                window.localStorage.removeItem("actionmaps-last-view");
+                // Force hard reload - this will process OAuth tokens on fresh load
+                window.location.hash = currentHash;
+                window.location.reload();
+                return; // Exit - page will reload
+              }
             }
-          } else {
-            console.warn("[SuccessPage] ⚠️ No session found, but continuing...");
+          }
+          
+          if (!sessionRestored) {
+            console.error("[SuccessPage] ❌ Failed to restore session after all attempts");
+            console.error("[SuccessPage] User may need to log in manually");
           }
         }
         
@@ -248,15 +287,20 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
     };
   }, [user, onSetAppView, onSetUser]);
 
-  // Auto-redirect to dashboard after a short delay
-  // Simplified - no complex session storage checks
+  // Auto-redirect to dashboard after session is confirmed
   useEffect(() => {
     if (!window.location.hash.startsWith("#success")) {
       return;
     }
 
+    // Only redirect if we have a user (session was restored)
+    if (!user) {
+      console.log("[SuccessPage] Waiting for user session to be restored...");
+      return;
+    }
+
     const redirectTimer = setTimeout(() => {
-      console.log("[SuccessPage] Auto-redirecting to dashboard...");
+      console.log("[SuccessPage] ✅ User confirmed, redirecting to dashboard...");
       
       // Clear caches
       if (typeof window !== "undefined") {
@@ -271,10 +315,10 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
       setTimeout(() => {
         window.history.replaceState(null, "", window.location.pathname);
       }, 500);
-    }, 3000); // Wait 3 seconds for session to be restored
+    }, 2000); // Wait 2 seconds after user is confirmed
     
     return () => clearTimeout(redirectTimer);
-  }, [onSetAppView]);
+  }, [onSetAppView, user]); // Only redirect when user is available
 
   return (
     <div className="app app-dark">

@@ -128,6 +128,18 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                 type="button"
                 className="hero-primary-cta hero-primary-cta-large"
                 onClick={() => {
+                  // CRITICAL: Save user session info before going to Stripe
+                  // This ensures we can restore it when coming back
+                  if (user) {
+                    const userInfo = {
+                      id: user.id,
+                      email: user.email,
+                      // Save current session token if available
+                    };
+                    sessionStorage.setItem("stripe-checkout-user", JSON.stringify(userInfo));
+                    console.log("[PricingPage] Saved user info before Stripe checkout:", userInfo);
+                  }
+                  
                   // Redirect to Stripe Payment Link
                   // IMPORTANT: Configure the success URL in Stripe Dashboard:
                   // https://dashboard.stripe.com → Products → Payment Links → Edit
