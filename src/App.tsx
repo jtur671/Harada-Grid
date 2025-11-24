@@ -154,16 +154,22 @@ const App: React.FC = () => {
               setSubscriptionStatus(status.plan);
             } else {
               // No subscription found in database
-              // Only fallback to localStorage if we don't already have a premium status
-              // This prevents overwriting premium with free if there's a temporary query failure
+              // In production, this means user is free (don't use localStorage)
+              // In dev, fallback to localStorage
               setSubscriptionStatus((prev) => {
                 // If we already have premium, keep it (might be a temporary query issue)
                 if (prev === "premium") {
                   console.log("[Subscription] Keeping existing premium status, ignoring null result");
                   return prev;
                 }
-                // Otherwise fallback to localStorage
-                return prev || plan;
+                // In production, no subscription = free (don't use localStorage)
+                // In dev, fallback to localStorage
+                if (isDev) {
+                  return prev || plan;
+                } else {
+                  console.log("[Subscription] No subscription in database, setting to free");
+                  return prev || "free";
+                }
               });
             }
           })
@@ -177,8 +183,14 @@ const App: React.FC = () => {
                 console.log("[Subscription] Keeping existing premium status despite error");
                 return prev;
               }
-              // Only fallback if we don't already have a status
-              return prev || plan;
+              // In production, errors mean free (don't use localStorage)
+              // In dev, fallback to localStorage
+              if (isDev) {
+                return prev || plan;
+              } else {
+                // Production: error = free (don't use localStorage)
+                return prev || "free";
+              }
             });
           });
       }, 200); // Small delay to debounce
@@ -298,17 +310,22 @@ const App: React.FC = () => {
         if (hasOAuthTokens) {
           // Clear the hash to clean up the URL
           window.history.replaceState(null, "", window.location.pathname + window.location.search);
-          // Force redirect - wait a moment for webhook to process subscription
+          // Force redirect immediately - don't wait, don't preserve pricing page
+          console.log("[OAuth] Detected OAuth tokens on initial load, forcing redirect to dashboard");
+          setAppView("dashboard"); // Force redirect immediately
+          
+          // Then refresh subscription status and load projects in background
           setTimeout(() => {
             if (!cancelled) {
               // Refresh subscription status first (webhook may have just created it)
               getSubscriptionStatus(current.id).then((status) => {
                 if (status && !cancelled) {
+                  console.log("[OAuth] Subscription status after callback:", status.plan);
                   setSubscriptionStatus(status.plan);
                 }
-                // Then force redirect to dashboard, don't preserve pricing page
+                // Load projects to refresh the list (preserve view since we already redirected)
                 if (!cancelled) {
-                  loadProjectsForUser(current, false);
+                  loadProjectsForUser(current, true);
                 }
               });
             }
@@ -365,18 +382,23 @@ const App: React.FC = () => {
               // If coming back from OAuth, always redirect (even if auth is initialized)
               // This handles the case where user completes Stripe checkout
               if (isOAuthCallback) {
-                // Clear the hash to clean up the URL
+                // Clear the hash to clean up the URL immediately
                 window.history.replaceState(null, "", window.location.pathname + window.location.search);
-                // Wait a moment for webhook to process subscription, then force redirect
-                // Don't preserve pricing page - always redirect to dashboard
+                
+                // Force redirect immediately - don't wait, don't preserve pricing page
+                // The subscription check will happen in the background
+                console.log("[OAuth] Detected OAuth callback, forcing redirect to dashboard");
+                setAppView("dashboard"); // Force redirect immediately
+                
+                // Then refresh subscription status and load projects in background
                 setTimeout(() => {
-                  // Force redirect - refresh subscription status first
                   getSubscriptionStatus(u.id).then((status) => {
                     if (status) {
+                      console.log("[OAuth] Subscription status after callback:", status.plan);
                       setSubscriptionStatus(status.plan);
                     }
-                    // Then load projects which will redirect appropriately
-                    loadProjectsForUser(u, false);
+                    // Load projects to refresh the list
+                    loadProjectsForUser(u, true); // Preserve view since we already redirected
                   });
                 }, 2000); // Give webhook 2 seconds to process
                 return;
