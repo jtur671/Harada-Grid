@@ -26,19 +26,26 @@ export const useProjects = ({
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const loadingRef = useRef<boolean>(false);
+  const loadTimeoutRef = useRef<number | null>(null);
 
   const loadProjects = useCallback(async (preserveView = false) => {
     if (!user) return;
     
     // Prevent concurrent requests, but allow retry after a delay if previous request failed
     if (loadingRef.current) {
-      console.log("[loadProjects] Already loading, skipping duplicate request");
-      // If we've been loading for more than 5 seconds, allow a retry
+      // If we've been loading for more than 3 seconds, allow a retry
       // This prevents getting stuck if a request hangs
-      return;
+      const timeSinceLastLoad = Date.now() - (loadTimeoutRef.current || 0);
+      if (timeSinceLastLoad > 3000) {
+        console.log("[loadProjects] Previous load took too long, allowing retry");
+        loadingRef.current = false;
+      } else {
+        return;
+      }
     }
     
     loadingRef.current = true;
+    loadTimeoutRef.current = Date.now();
     
     // Safety timeout: if loading takes more than 10 seconds, reset the flag
     const safetyTimeout = setTimeout(() => {
@@ -54,6 +61,17 @@ export const useProjects = ({
         .select("id,title,updated_at,state")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
+
+      console.log("[loadProjects] Database query result:", {
+        count: data?.length || 0,
+        error: error?.message || null,
+        projects: data?.map(p => ({
+          id: p.id,
+          title: p.title,
+          goal: (p.state as any)?.goal || null,
+          updated_at: p.updated_at,
+        })),
+      });
 
       if (error) {
         // Don't log network errors that might be temporary
@@ -200,19 +218,39 @@ export const useProjects = ({
   };
 
   const openProject = async (projectId: string): Promise<HaradaState | null> => {
+    if (!user) {
+      console.error("[openProject] No user - cannot open project");
+      return null;
+    }
+
+    // SECURITY: Always verify user_id to prevent access to other users' projects
     const { data, error } = await supabase
       .from("action_maps")
       .select("state")
       .eq("id", projectId)
+      .eq("user_id", user.id) // CRITICAL: Prevent access to other users' projects
       .single();
 
     if (error || !data?.state) {
-      console.error("Failed to open project", error);
+      console.error("[openProject] Failed to open project", error);
       return null;
     }
 
+    const loadedState = data.state as HaradaState;
+    console.log("[openProject] Loading project state:", {
+      projectId,
+      hasState: !!data.state,
+      goal: loadedState?.goal || "(no goal)",
+      goalLength: loadedState?.goal?.length || 0,
+      goalPreview: loadedState?.goal?.substring(0, 50) || "(no goal)",
+      hasPillars: loadedState?.pillars?.length > 0,
+      pillarsWithContent: loadedState?.pillars?.filter(p => p?.trim()).length || 0,
+      hasTasks: loadedState?.tasks?.length > 0,
+      tasksWithContent: loadedState?.tasks?.flat().filter(t => t?.trim()).length || 0,
+    });
+
     setCurrentProjectId(projectId);
-    return data.state as HaradaState;
+    return loadedState;
   };
 
   const deleteProject = async (projectId: string): Promise<boolean> => {

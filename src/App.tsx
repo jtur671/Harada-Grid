@@ -71,6 +71,8 @@ const App: React.FC = () => {
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionPlan>(null);
   const authInitializedRef = useRef<boolean>(false);
   const lastSavedStateRef = useRef<string>("");
+  const justLoadedProjectRef = useRef<boolean>(false);
+  const autosaveTimeoutRef = useRef<number | null>(null); // Store timeout ID in ref
 
   const isLoggedIn = !!user;
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
@@ -100,6 +102,12 @@ const App: React.FC = () => {
     hasDismissedStartModal,
   });
 
+  // Store updateProjectInList in ref to avoid dependency issues in autosave effect
+  const updateProjectInListRef = useRef(updateProjectInList);
+  useEffect(() => {
+    updateProjectInListRef.current = updateProjectInList;
+  }, [updateProjectInList]);
+
   // Check if user has reached their map limit
   const mapLimit = isPro ? PRO_PLAN_MAP_LIMIT : FREE_PLAN_MAP_LIMIT;
   const hasReachedMapLimit = !isPro && projects.length >= FREE_PLAN_MAP_LIMIT;
@@ -109,27 +117,51 @@ const App: React.FC = () => {
   };
 
   // Load subscription status from database when user logs in
-  // Only check once per user login to avoid excessive requests
+  // In development: localStorage takes precedence (allows manual override)
+  // In production: database subscription status takes precedence
   useEffect(() => {
     if (isLoggedIn && user) {
       let cancelled = false;
       
+      // Check if we're in development mode
+      const isDev = import.meta.env.DEV;
+      
+      // In development, if localStorage has a plan set, use it and skip database check
+      // This allows manual override for local testing
+      if (isDev && plan) {
+        console.log("[Subscription] Development mode: Using localStorage plan:", plan, "(skipping database check)");
+        // Keep subscriptionStatus as null so isPro falls back to localStorage plan
+        setSubscriptionStatus(null);
+        return;
+      }
+      
+      // In production (or if no localStorage plan in dev), check database
       // Debounce to avoid too many requests
       const timeoutId = setTimeout(() => {
         getSubscriptionStatus(user.id)
           .then((status) => {
             if (cancelled) return;
             if (status) {
+              // In production, database status always wins
+              // In dev (if we get here), only use database if localStorage is empty
+              if (isDev && plan) {
+                // Dev mode with localStorage set - don't overwrite
+                console.log("[Subscription] Dev mode: Keeping localStorage plan, ignoring database:", status.plan);
+                return;
+              }
               setSubscriptionStatus(status.plan);
             } else {
               // Fallback to localStorage for development/testing or if table doesn't exist
-              setSubscriptionStatus(plan);
+              // Don't overwrite if we already have a subscription status from a previous check
+              setSubscriptionStatus((prev) => prev || plan);
             }
           })
-          .catch(() => {
+          .catch((err) => {
             if (cancelled) return;
-            // Silently fallback to localStorage on error (table might not exist yet)
-            setSubscriptionStatus(plan);
+            // Log the error for debugging
+            console.warn("[Subscription] Failed to fetch subscription status:", err);
+            // Only fallback if we don't already have a status
+            setSubscriptionStatus((prev) => prev || plan);
           });
       }, 200); // Small delay to debounce
 
@@ -140,7 +172,7 @@ const App: React.FC = () => {
     } else {
       setSubscriptionStatus(null);
     }
-  }, [isLoggedIn, user?.id]); // Only depend on user.id, not plan
+  }, [isLoggedIn, user?.id, plan]); // Include plan so it re-checks if localStorage plan changes
 
   // Debug: Log plan status (only once when it changes, not on every render)
   const prevPlanStatusRef = useRef<string | null>(null);
@@ -184,10 +216,16 @@ const App: React.FC = () => {
   const openProject = async (projectId: string) => {
     const projectState = await openProjectFromHook(projectId);
     if (projectState) {
+      // Mark that we just loaded a project to prevent autosave from overwriting it
+      justLoadedProjectRef.current = true;
       setState(projectState);
       setViewMode("grid");
       setStartModalOpen(false);
       setAppView("builder");
+      // Clear the flag after 2 seconds
+      setTimeout(() => {
+        justLoadedProjectRef.current = false;
+      }, 2000);
     }
   };
 
@@ -200,9 +238,15 @@ const App: React.FC = () => {
     setExampleState(buildExampleState(id));
   };
 
+  // Save to localStorage only if not logged in or no current project
+  // (logged-in users save to Supabase via autosave, so we don't want localStorage to interfere)
   useEffect(() => {
-    saveState(state);
-  }, [state]);
+    // Only save to localStorage for non-logged-in users or when there's no current project
+    // This prevents localStorage from overwriting the loaded project state
+    if (!isLoggedIn || !currentProjectId) {
+      saveState(state);
+    }
+  }, [state, isLoggedIn, currentProjectId]);
 
   // Persist plan to localStorage
   useEffect(() => {
@@ -325,119 +369,92 @@ const App: React.FC = () => {
   // Loading the first project's state here was interfering with the current state
 
   // Auto-save grid to Supabase for logged-in users & current project
+  // Separate effect that only watches state changes - avoids cleanup interference
   useEffect(() => {
-    // Debug: Log autosave conditions
-    const conditions = {
-      isLoggedIn,
-      hasUser: !!user,
-      currentProjectId,
-      appView,
-      isBuilder: appView === "builder",
-    };
-    
-    // Don't auto-save if not in builder view or if no current project
-    if (!isLoggedIn || !user || !currentProjectId || appView !== "builder") {
-      console.log("[autosave] ❌ Conditions not met:", conditions);
+    // Skip if conditions aren't met
+    if (appView !== "builder" || !isLoggedIn || !user || !currentProjectId || justLoadedProjectRef.current) {
       return;
     }
 
-    // Only save if state has actual content (not just empty state)
+    // Only save if state has actual content
     const hasContent = state.goal?.trim() || 
       state.pillars.some(p => p?.trim()) || 
       state.tasks.some(row => row.some(t => t?.trim()));
 
     if (!hasContent) {
-      console.log("[autosave] ⏭️ Skipping - state is empty:", {
-        goal: state.goal || "(empty)",
-        hasPillars: state.pillars.some(p => p?.trim()),
-        hasTasks: state.tasks.some(row => row.some(t => t?.trim())),
-      });
       return;
     }
 
-    // Create a fingerprint of the state to detect actual changes
+    // Create fingerprint to detect changes
     const stateFingerprint = JSON.stringify({
       goal: state.goal,
       pillars: state.pillars,
       tasks: state.tasks,
     });
 
-    // Skip if state hasn't actually changed
+    // Skip if already saved
     if (lastSavedStateRef.current === stateFingerprint) {
       return;
     }
 
-    // Debug: Log what we're about to save (only when state changes)
-    console.log("[autosave] 📝 State changed, will save in 800ms:", {
-      goal: state.goal || "(empty)",
-      goalLength: state.goal?.length || 0,
-      goalPreview: state.goal?.substring(0, 50) || "(empty)",
-      hasPillars: state.pillars.some(p => p?.trim()),
-      hasTasks: state.tasks.some(row => row.some(t => t?.trim())),
-    });
+    // Log once when autosave starts
+    if (lastSavedStateRef.current === "") {
+      console.log("[autosave] on:");
+    }
 
-    const timeoutId = window.setTimeout(async () => {
+    // Clear any existing timeout
+    if (autosaveTimeoutRef.current !== null) {
+      window.clearTimeout(autosaveTimeoutRef.current);
+    }
+
+    // Capture everything we need
+    const stateToSave = state;
+    const projectIdToSave = currentProjectId;
+    const userIdToSave = user.id;
+    
+    // Set timeout - this will execute after 800ms of no changes
+    console.log("[autosave] ⏱️ Setting timeout, will save in 800ms if no more changes");
+    autosaveTimeoutRef.current = window.setTimeout(async () => {
+      autosaveTimeoutRef.current = null;
+      console.log("[autosave] ⏰ Timeout executed! Saving now...");
+      
       try {
-        // Capture state at the time of save (create a deep copy to avoid stale closure)
-        const stateSnapshot = {
-          ...state,
-          goal: state.goal,
-          pillars: [...state.pillars],
-          tasks: state.tasks.map(row => [...row]),
-          diaryByDate: { ...state.diaryByDate },
-          progressByDate: { ...state.progressByDate },
-          completedDates: [...state.completedDates],
-        };
         const now = new Date().toISOString();
-
-        // Debug: Log what we're actually saving
-        console.log("[autosave] 💾 Saving to database:", {
-          projectId: currentProjectId,
-          goal: stateSnapshot.goal || "(empty)",
-          goalLength: stateSnapshot.goal?.length || 0,
-          goalPreview: stateSnapshot.goal?.substring(0, 50) || "(empty)",
-          hasPillars: stateSnapshot.pillars.length > 0,
-          pillarsCount: stateSnapshot.pillars.filter(p => p && p.trim()).length,
-          hasTasks: stateSnapshot.tasks.length > 0,
-          tasksCount: stateSnapshot.tasks.flat().filter(t => t && t.trim()).length,
-        });
-
-        // Update without goal column (goal is stored in state.goal)
-        const updatePayload = {
-          state: stateSnapshot,
-        };
-
-        const { error } = await supabase
+        const { error, data } = await supabase
           .from("action_maps")
-          .update(updatePayload)
-          .eq("id", currentProjectId)
-          .eq("user_id", user.id);
+          .update({
+            state: stateToSave,
+            updated_at: now,
+          })
+          .eq("id", projectIdToSave)
+          .eq("user_id", userIdToSave)
+          .select("id,title,updated_at,state");
 
         if (error) {
-          console.error("[autosave] Error saving to cloud:", error);
+          console.error("[autosave] ❌ Error:", error);
         } else {
-          // Keep dashboard list up to date (goal comes from state)
-          updateProjectInList(currentProjectId, {
-            goal: stateSnapshot.goal || null,
+          const savedGoal = (data?.[0]?.state as HaradaState)?.goal || null;
+          console.log("[autosave] ✅ Saved:", {
+            goal: savedGoal?.substring(0, 40) || "(no goal)",
+            goalLength: savedGoal?.length || 0,
+          });
+          
+          updateProjectInListRef.current(projectIdToSave, {
+            goal: savedGoal,
             updated_at: now,
           });
           
-          // Update the fingerprint to prevent duplicate saves
-          lastSavedStateRef.current = stateFingerprint;
-          
-          console.log("[autosave] ✅ Saved successfully:", {
-            projectId: currentProjectId,
-            goal: stateSnapshot.goal?.substring(0, 50) || "(no goal)",
-            updated_at: now,
+          lastSavedStateRef.current = JSON.stringify({
+            goal: stateToSave.goal,
+            pillars: stateToSave.pillars,
+            tasks: stateToSave.tasks,
           });
         }
       } catch (e) {
-        console.error("[autosave] ❌ Exception saving to cloud:", e);
+        console.error("[autosave] ❌ Exception:", e);
       }
-    }, 800); // debounce
-
-    return () => window.clearTimeout(timeoutId);
-  }, [user, state, isLoggedIn, currentProjectId, appView, updateProjectInList]);
+    }, 800);
+  }, [state, appView, isLoggedIn, user, currentProjectId]); // Only re-run when these change
 
   const {
     progressForDay,
@@ -613,7 +630,15 @@ const App: React.FC = () => {
         onSetStartModalOpen={setStartModalOpen}
         onSetAppView={setAppView}
         onSetAuthView={setAuthView}
-        onSetCurrentProjectId={setCurrentProjectId}
+        onSetCurrentProjectId={(id) => {
+          // When setting project ID from dashboard, mark that we just loaded
+          justLoadedProjectRef.current = true;
+          setCurrentProjectId(id);
+          // Clear the flag after 2 seconds
+          setTimeout(() => {
+            justLoadedProjectRef.current = false;
+          }, 2000);
+        }}
         onDeleteProject={handleDeleteProject}
         onProjectTitleUpdated={handleProjectTitleUpdated}
       />

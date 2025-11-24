@@ -45,9 +45,15 @@ export const getSubscriptionStatus = async (
         return null;
       }
       
+      // Handle 406 Not Acceptable (might be RLS issue or table structure mismatch)
+      if (error.message?.includes("406") || error.message?.includes("Not Acceptable")) {
+        console.warn("[Subscription] 406 error - table may not be set up correctly. Using localStorage fallback.");
+        return null;
+      }
+      
       // Only log non-critical errors
       if (error.code !== "PGRST116") {
-        console.error("Error fetching subscription:", error);
+        console.error("[Subscription] Error fetching subscription:", error);
       }
       return null;
     }

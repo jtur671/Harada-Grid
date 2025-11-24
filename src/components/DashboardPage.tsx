@@ -63,15 +63,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       return;
     }
 
+    if (!user) {
+      setEditingId(null);
+      return;
+    }
+
     const now = new Date().toISOString();
 
+    // SECURITY: Always verify user_id to prevent modifying other users' projects
     const { error } = await supabase
       .from("action_maps")
       .update({
         title: trimmed,
         updated_at: now,
       })
-      .eq("id", project.id);
+      .eq("id", project.id)
+      .eq("user_id", user.id); // CRITICAL: Prevent modifying other users' projects
 
     if (error) {
       console.error("Failed to rename project", error);
@@ -149,11 +156,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   tabIndex={0}
                   onClick={async () => {
                     if (editingId === p.id) return; // Don't open if editing
+                    if (!user) return; // Security: must be logged in
                     // Load this project and jump into builder (View mode)
+                    // SECURITY: Always verify user_id to prevent data leaks
                     const { data, error } = await supabase
                       .from("action_maps")
                       .select("state")
                       .eq("id", p.id)
+                      .eq("user_id", user.id) // CRITICAL: Prevent access to other users' projects
                       .single();
 
                     if (!error && data?.state) {
@@ -171,10 +181,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         stateIsObject: data.state && typeof data.state === 'object',
                         stateKeys: data.state ? Object.keys(data.state) : [],
                       });
+                      // Set project ID FIRST to prevent autosave from saving to wrong project
+                      onSetCurrentProjectId(p.id);
+                      // Set state immediately - the loaded state should override any localStorage state
                       onSetState(loadedState);
                       onSetViewMode("grid");
                       onSetStartModalOpen(false);
-                      onSetCurrentProjectId(p.id);
                       onSetAppView("builder");
                     } else {
                       console.error("[Dashboard] Error loading project:", error, "data:", data);
