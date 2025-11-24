@@ -35,11 +35,49 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
 
     const initializeSuccess = async () => {
       try {
+        // Step 0: Force hard reload on first visit from Stripe (only once)
+        const hardReloadKey = "stripe-success-hard-reload";
+        const hasHardReloaded = sessionStorage.getItem(hardReloadKey);
+        
+        if (!hasHardReloaded) {
+          // Mark that we're about to do a hard reload
+          sessionStorage.setItem(hardReloadKey, "true");
+          
+          // Clear relevant caches
+          console.log("[SuccessPage] Clearing cache and forcing hard reload...");
+          
+          // Clear projects cache
+          if (typeof window !== "undefined") {
+            const projectsCacheKey = "actionmaps-projects-cache";
+            window.localStorage.removeItem(projectsCacheKey);
+          }
+          
+          // Force a hard reload by adding a cache-busting parameter
+          const url = new URL(window.location.href);
+          url.searchParams.set("_reload", Date.now().toString());
+          url.hash = "#success"; // Preserve success hash
+          
+          // Use location.replace to avoid adding to history
+          window.location.replace(url.toString());
+          return; // Exit early - page will reload
+        }
+        
         // Step 1: Check for Stripe success parameters (in both search and hash)
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const sessionId = urlParams.get("session_id") || hashParams.get("session_id");
         const redirectStatus = urlParams.get("redirect_status") || hashParams.get("redirect_status");
+        
+        // Clean up the reload parameter if present
+        if (urlParams.has("_reload")) {
+          urlParams.delete("_reload");
+          const newSearch = urlParams.toString();
+          window.history.replaceState(
+            null,
+            "",
+            `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${window.location.hash}`
+          );
+        }
 
         // Clean up URL - remove success params from both search and hash
         if (sessionId || redirectStatus) {
