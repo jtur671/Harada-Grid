@@ -43,22 +43,21 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
           // Mark that we're about to do a hard reload
           sessionStorage.setItem(hardReloadKey, "true");
           
-          // Clear relevant caches
-          console.log("[SuccessPage] Clearing cache and forcing hard reload...");
+          // Clear ALL relevant caches aggressively
+          console.log("[SuccessPage] Clearing all caches and forcing hard reload...");
           
-          // Clear projects cache
           if (typeof window !== "undefined") {
+            // Clear projects cache
             const projectsCacheKey = "actionmaps-projects-cache";
             window.localStorage.removeItem(projectsCacheKey);
+            
+            // Clear last view to force fresh load
+            window.localStorage.removeItem("actionmaps-last-view");
           }
           
-          // Force a hard reload by adding a cache-busting parameter
-          const url = new URL(window.location.href);
-          url.searchParams.set("_reload", Date.now().toString());
-          url.hash = "#success"; // Preserve success hash
-          
-          // Use location.replace to avoid adding to history
-          window.location.replace(url.toString());
+          // Force a hard reload by using location.reload()
+          // This should clear cache and reload fresh
+          window.location.reload();
           return; // Exit early - page will reload
         }
         
@@ -243,6 +242,36 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
     };
   }, [user, onSetAppView, onSetUser]);
 
+  // Auto-redirect to dashboard immediately with hard reload
+  useEffect(() => {
+    // Skip the whole success page flow - just redirect to dashboard with a refresh
+    const redirectKey = "stripe-success-redirect";
+    const hasRedirected = sessionStorage.getItem(redirectKey);
+    
+    if (!hasRedirected && window.location.hash.startsWith("#success")) {
+      sessionStorage.setItem(redirectKey, "true");
+      console.log("[SuccessPage] Auto-redirecting to dashboard with hard reload...");
+      
+      // Clear ALL caches aggressively
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("actionmaps-projects-cache");
+        window.localStorage.removeItem("actionmaps-last-view");
+        // Clear any other relevant caches
+        Object.keys(window.localStorage).forEach(key => {
+          if (key.startsWith("actionmaps-") || key.startsWith("sb-")) {
+            window.localStorage.removeItem(key);
+          }
+        });
+      }
+      
+      // Redirect to dashboard and force a true hard reload
+      // Use location.replace to avoid history entry, then reload
+      window.location.replace("/#dashboard");
+      // Force reload immediately - this should bypass cache
+      window.location.reload();
+    }
+  }, []);
+
   return (
     <div className="app app-dark">
       <div className="home-shell">
@@ -263,7 +292,7 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
               <div style={{ textAlign: "center" }}>
                 <h1 style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>Processing your upgrade...</h1>
                 <p style={{ fontSize: "1.125rem", color: "#888", marginBottom: "2rem" }}>
-                  Please wait while we confirm your subscription.
+                  Redirecting to dashboard...
                 </p>
                 <button
                   type="button"
@@ -271,12 +300,12 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
                   onClick={() => {
                     // Allow user to skip waiting and go to dashboard
                     console.log("[SuccessPage] User clicked to skip waiting");
-                    setIsLoading(false);
-                    onSetAppView("dashboard");
+                    window.location.href = "/#dashboard";
+                    window.location.reload();
                   }}
                   style={{ marginTop: "1rem" }}
                 >
-                  Continue to Dashboard
+                  Go to Dashboard Now
                 </button>
               </div>
             ) : error ? (

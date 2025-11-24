@@ -270,11 +270,18 @@ const App: React.FC = () => {
       // Mark that we just loaded a project to prevent autosave from overwriting it
       justLoadedProjectRef.current = true;
       setState(projectState);
-      // Only set viewMode to grid if we're not already in builder with this project
-      // This preserves the user's view mode preference when switching between projects
-      if (currentProjectId !== projectId || appView !== "builder") {
+      // CRITICAL: Only set viewMode to grid if we're opening a DIFFERENT project
+      // If we're already viewing this project, preserve the current viewMode
+      // This prevents Edit mode from being reset to View mode
+      const isSameProject = currentProjectId === projectId;
+      const isAlreadyInBuilder = appView === "builder";
+      
+      if (!isSameProject || !isAlreadyInBuilder) {
+        // Only reset viewMode when opening a different project or coming from another view
         setViewMode("grid");
       }
+      // If same project and already in builder, DON'T change viewMode - preserve user's choice
+      
       setStartModalOpen(false);
       setAppView("builder");
       // Clear the flag after 2 seconds
@@ -575,10 +582,11 @@ const App: React.FC = () => {
               clearTimeout(authHandlerTimeoutRef.current);
             }
             
-            // CRITICAL: Skip if we're in builder view with a project open - don't interrupt the user
-            // This prevents redirects when user is editing (viewMode === "map")
-            if (currentView === "builder" && currentProjectId) {
-              console.log("[Auth] Skipping loadProjects - user is in builder with project open");
+            // CRITICAL: Skip if we're in builder view - don't interrupt the user at all
+            // This prevents redirects and viewMode resets when user is editing (viewMode === "map")
+            // Skip even if no project open - user might be creating a new map
+            if (currentView === "builder") {
+              console.log("[Auth] Skipping loadProjects - user is in builder view (preserving viewMode)");
               return currentView;
             }
             
