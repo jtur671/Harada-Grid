@@ -64,7 +64,13 @@ const App: React.FC = () => {
   );
 
   // Initialize appView from localStorage if available, otherwise default to "home"
+  // BUT check hash first - if we have #success, override to success view
   const [appView, setAppView] = useState<AppView>(() => {
+    // Check hash immediately on mount - if #success, go there
+    if (typeof window !== "undefined" && window.location.hash.startsWith("#success")) {
+      console.log("[App] Initial mount: detected #success hash, setting view to success");
+      return "success";
+    }
     const lastView = getLastView();
     return lastView || "home";
   });
@@ -399,11 +405,29 @@ const App: React.FC = () => {
     ensureSessionAndRedirect();
   }, [pendingCheckoutRedirect, user, loadProjectsForUser]);
 
+  // Check hash on mount and whenever it changes - handle success redirect immediately
+  useEffect(() => {
+    const checkHash = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith("#success")) {
+        console.log("[App] Hash check: detected #success, ensuring view is set to success");
+        setAppView("success");
+      }
+    };
+    
+    // Check immediately
+    checkHash();
+    
+    // Also listen for hash changes
+    window.addEventListener("hashchange", checkHash);
+    return () => window.removeEventListener("hashchange", checkHash);
+  }, []);
+
   // Load current session + watch for changes
   useEffect(() => {
     let cancelled = false;
     
-    // Check if we're coming back from Stripe checkout success
+    // Check if we're coming back from Stripe checkout success - DO THIS SYNCHRONOUSLY
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const sessionId = urlParams.get("session_id") || hashParams.get("session_id");
@@ -411,31 +435,36 @@ const App: React.FC = () => {
     const isStripeSuccess = sessionId || (redirectStatus && redirectStatus === "succeeded");
     const isSuccessHash = window.location.hash.startsWith("#success");
     
+    // If we detect success hash, set view immediately (before async session load)
+    if (isSuccessHash || isStripeSuccess) {
+      console.log("[Stripe] Detected success hash/params, setting view to success immediately");
+      setAppView("success");
+      // Clean up URL immediately
+      const cleanParams = new URLSearchParams(urlParams);
+      cleanParams.delete("session_id");
+      cleanParams.delete("redirect_status");
+      const newSearch = cleanParams.toString();
+      const cleanHash = hashParams.has("access_token") ? window.location.hash : "";
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${cleanHash}`
+      );
+    }
+    
     // Check if we're coming back from OAuth (has tokens in URL hash, but not success)
     const hasOAuthTokens = !isSuccessHash && (hashParams.has("access_token") || hashParams.has("error"));
     
-    // Load session first, then handle redirects
+    // Load session, then handle other redirects
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       const current = data.session?.user ?? null;
       setUser(current);
       
-      // If Stripe success, redirect to success page (but only after loading session)
+      // If we already set success view above, just load subscription/projects in background
       if (isStripeSuccess || isSuccessHash) {
-        // Clean up URL - remove success params from both search and hash
-        const cleanParams = new URLSearchParams(urlParams);
-        cleanParams.delete("session_id");
-        cleanParams.delete("redirect_status");
-        const newSearch = cleanParams.toString();
-        const cleanHash = hashParams.has("access_token") ? window.location.hash : ""; // Keep OAuth tokens if present
-        window.history.replaceState(
-          null,
-          "",
-          `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${cleanHash}`
-        );
-        console.log("[Stripe] Detected successful return from checkout, redirecting to success page");
-        setAppView("success");
-        // Still load projects in background if user exists
+        console.log("[Stripe] Session loaded, refreshing subscription status in background");
+        // Load subscription status and projects in background
         if (current) {
           setTimeout(() => {
             if (!cancelled) {
