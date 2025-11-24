@@ -28,34 +28,108 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
   const [subscriptionStatus, setSubscriptionStatus] = useState<"free" | "premium" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // CRITICAL: Force Supabase to process OAuth tokens from hash
-  // Then wait for App.tsx to set the user
+  // CRITICAL: Restore session after Stripe checkout
+  // Strategy:
+  // 1. Check for session_id from Stripe (in query params or hash)
+  // 2. Try to restore session from saved user info in sessionStorage
+  // 3. Try to get session from Supabase
+  // 4. If OAuth tokens are in hash, force Supabase to process them
   useEffect(() => {
     if (!window.location.hash.startsWith("#success")) {
       return;
     }
 
+    const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const sessionId = urlParams.get("session_id") || hashParams.get("session_id");
     const hasOAuthTokens = hashParams.has("access_token");
     
+    console.log("[SuccessPage] Stripe redirect detected:", { sessionId, hasOAuthTokens });
+    
     const restoreSession = async () => {
+      // If we already have a user, we're good
+      if (user) {
+        console.log("[SuccessPage] ✅ User already in state:", user.email);
+        setIsLoading(false);
+        setTimeout(() => {
+          window.localStorage.removeItem("actionmaps-projects-cache");
+          window.localStorage.removeItem("actionmaps-last-view");
+          onSetAppView("dashboard");
+          window.history.replaceState(null, "", window.location.pathname);
+        }, 2000);
+        return;
+      }
+
+      // Try to restore from saved user info
+      const savedUserInfo = sessionStorage.getItem("stripe-checkout-user");
+      if (savedUserInfo) {
+        try {
+          const userInfo = JSON.parse(savedUserInfo);
+          console.log("[SuccessPage] Found saved user info:", userInfo.email);
+          
+          // Try to get session from Supabase
+          for (let attempt = 0; attempt < 5; attempt++) {
+            console.log(`[SuccessPage] Attempt ${attempt + 1}: Getting session...`);
+            
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionData?.session?.user) {
+              console.log("[SuccessPage] ✅ Session restored:", sessionData.session.user.email);
+              if (onSetUser) {
+                onSetUser(sessionData.session.user);
+              }
+              setIsLoading(false);
+              
+              // Clean up saved user info
+              sessionStorage.removeItem("stripe-checkout-user");
+              
+              // Check subscription status
+              getSubscriptionStatus(sessionData.session.user.id).then((status) => {
+                if (status) {
+                  setSubscriptionStatus(status.plan);
+                }
+              }).catch((err) => {
+                console.warn("[SuccessPage] Error checking subscription:", err);
+              });
+              
+              // Redirect to dashboard after 2 seconds
+              setTimeout(() => {
+                window.localStorage.removeItem("actionmaps-projects-cache");
+                window.localStorage.removeItem("actionmaps-last-view");
+                onSetAppView("dashboard");
+                window.history.replaceState(null, "", window.location.pathname);
+              }, 2000);
+              return;
+            } else {
+              console.warn(`[SuccessPage] No session (attempt ${attempt + 1}):`, sessionError?.message || "No session");
+              if (attempt < 4) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              }
+            }
+          }
+        } catch (err) {
+          console.error("[SuccessPage] Error parsing saved user info:", err);
+        }
+      }
+
+      // If OAuth tokens are in hash, force Supabase to process them
       if (hasOAuthTokens) {
         console.log("[SuccessPage] OAuth tokens detected - forcing Supabase to process them...");
         
-        // CRITICAL: Call getSession() to force Supabase to process OAuth tokens from hash
-        // This will trigger onAuthStateChange in App.tsx
-        for (let attempt = 0; attempt < 10; attempt++) {
-          console.log(`[SuccessPage] Attempt ${attempt + 1}: Checking session...`);
+        for (let attempt = 0; attempt < 5; attempt++) {
+          console.log(`[SuccessPage] OAuth attempt ${attempt + 1}: Getting session...`);
           
           const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
           
           if (sessionData?.session?.user) {
-            console.log("[SuccessPage] ✅ Session found:", sessionData.session.user.email);
-            // Notify parent to update user state
+            console.log("[SuccessPage] ✅ Session found via OAuth:", sessionData.session.user.email);
             if (onSetUser) {
               onSetUser(sessionData.session.user);
             }
             setIsLoading(false);
+            
+            // Clean up saved user info
+            sessionStorage.removeItem("stripe-checkout-user");
             
             // Check subscription status
             getSubscriptionStatus(sessionData.session.user.id).then((status) => {
@@ -75,34 +149,22 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
             }, 2000);
             return;
           } else {
-            console.warn(`[SuccessPage] No session (attempt ${attempt + 1}):`, sessionError?.message || "No session");
-            if (attempt < 9) {
+            console.warn(`[SuccessPage] No session via OAuth (attempt ${attempt + 1}):`, sessionError?.message || "No session");
+            if (attempt < 4) {
               await new Promise((resolve) => setTimeout(resolve, 1000));
             }
           }
         }
-        
-        // If we get here, session wasn't restored
-        console.error("[SuccessPage] ❌ Failed to restore session after all attempts");
-        setIsLoading(false);
-        setError("Session restoration failed. Please try logging in again.");
-      } else {
-        // No OAuth tokens - user should already be logged in
-        console.log("[SuccessPage] No OAuth tokens - user should already be logged in");
-        if (user) {
-          setIsLoading(false);
-          setTimeout(() => {
-            onSetAppView("dashboard");
-          }, 2000);
-        } else {
-          setIsLoading(false);
-          setError("Please log in to continue.");
-        }
       }
+      
+      // If we get here, session wasn't restored
+      console.error("[SuccessPage] ❌ Failed to restore session");
+      setIsLoading(false);
+      setError("Session restoration failed. Please try logging in again.");
     };
 
     restoreSession();
-  }, [onSetAppView, onSetUser]);
+  }, [user, onSetAppView, onSetUser]);
 
   return (
     <div className="app app-dark">
