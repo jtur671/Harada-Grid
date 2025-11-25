@@ -944,6 +944,8 @@ const App: React.FC = () => {
         isPro={isPro}
         hasReachedMapLimit={hasReachedMapLimit}
         authView={authView}
+        currentProjectId={currentProjectId}
+        appView={appView}
         onSetState={setState}
         onSetViewMode={setViewMode}
         onSetStartModalOpen={setStartModalOpen}

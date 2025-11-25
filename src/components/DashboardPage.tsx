@@ -22,6 +22,8 @@ type DashboardPageProps = {
   isPro?: boolean;
   hasReachedMapLimit?: boolean;
   authView: AuthView;
+  currentProjectId: string | null; // Add current project ID to check if same project
+  appView: "home" | "builder" | "harada" | "dashboard" | "pricing" | "support" | "subscription"; // Add app view to check if in builder
   onSetState: (state: HaradaState) => void;
   onSetViewMode: (mode: "map" | "grid") => void;
   onSetStartModalOpen: (open: boolean) => void;
@@ -39,6 +41,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   isPro = false,
   hasReachedMapLimit = false,
   authView,
+  currentProjectId,
+  appView,
   onSetState,
   onSetViewMode,
   onSetStartModalOpen,
@@ -158,6 +162,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   onClick={async () => {
                     if (editingId === p.id) return; // Don't open if editing
                     if (!user) return; // Security: must be logged in
+                    
+                    // CRITICAL: If this is the same project already open, don't reload from database
+                    // This preserves in-memory state like completed actions
+                    if (currentProjectId === p.id && appView === "builder") {
+                      // Same project already open - just ensure we're in builder view
+                      // Don't reload state, preserve current state with completed actions
+                      onSetAppView("builder");
+                      return;
+                    }
+                    
+                    // Different project or not in builder - load from database
                     // Load this project and jump into builder (View mode)
                     // SECURITY: Always verify user_id to prevent data leaks
                     const { data, error } = await supabase
