@@ -28,29 +28,23 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
   const [subscriptionStatus, setSubscriptionStatus] = useState<"free" | "premium" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // CRITICAL: Ensure user session is restored after Stripe redirect
-  // Strategy:
-  // 1. Check if user is already in state (from App.tsx)
-  // 2. If not, try to restore from Supabase's localStorage session
-  // 3. If still no session, use saved user info to verify and potentially re-authenticate
+  // SIMPLE APPROACH: Use saved user ID to restore session from localStorage
+  // When user comes back from Stripe, Supabase session is in localStorage
+  // We just need to force Supabase to read it and set the user
   useEffect(() => {
     if (!window.location.hash.startsWith("#success")) {
       return;
     }
 
-    console.log("[SuccessPage] Ensuring user session is restored...");
+    console.log("[SuccessPage] Restoring user session from saved ID...");
     
-    let checkInterval: number | null = null;
-    let timeoutId: number | null = null;
-    
-    const restoreAndProceed = async () => {
-      // If we already have a user, proceed
+    const restoreSession = async () => {
+      // If user is already set, proceed
       if (user) {
         console.log("[SuccessPage] ✅ User already in state:", user.email);
         setIsLoading(false);
         sessionStorage.removeItem("stripe-checkout-user");
         
-        // Check subscription status
         getSubscriptionStatus(user.id).then((status) => {
           if (status) {
             setSubscriptionStatus(status.plan);
@@ -59,116 +53,119 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
           console.warn("[SuccessPage] Error checking subscription:", err);
         });
         
-        // Redirect to dashboard
         setTimeout(() => {
           window.localStorage.removeItem("actionmaps-projects-cache");
           window.localStorage.removeItem("actionmaps-last-view");
           onSetAppView("dashboard");
           window.history.replaceState(null, "", window.location.pathname);
         }, 2000);
-        
-        if (checkInterval) clearInterval(checkInterval);
-        if (timeoutId) clearTimeout(timeoutId);
-        return true;
+        return;
       }
       
-      // No user yet - try to get session from Supabase
-      console.log("[SuccessPage] No user in state, checking Supabase session...");
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionData?.session?.user) {
-        console.log("[SuccessPage] ✅ Session found in Supabase:", sessionData.session.user.email);
-        if (onSetUser) {
-          onSetUser(sessionData.session.user);
-        }
-        // Will proceed on next check when user is set
-        return false;
-      }
-      
-      // No session found - check if we have saved user info
+      // Get saved user ID from sessionStorage
       const savedUserInfo = sessionStorage.getItem("stripe-checkout-user");
-      if (savedUserInfo) {
-        try {
-          const userInfo = JSON.parse(savedUserInfo);
-          console.log("[SuccessPage] Found saved user info but no session:", userInfo.email);
-          console.log("[SuccessPage] Session error:", sessionError?.message || "No error");
-          
-          // Try to refresh the session - sometimes it's there but needs refresh
-          const { data: refreshData } = await supabase.auth.refreshSession();
-          if (refreshData?.session?.user) {
-            console.log("[SuccessPage] ✅ Session refreshed:", refreshData.session.user.email);
-            if (onSetUser) {
-              onSetUser(refreshData.session.user);
-            }
-            return false; // Will proceed on next check
-          }
-          
-          // If still no session, the session was lost during redirect
-          // We can't restore it without the actual token, but we can check localStorage directly
-          console.log("[SuccessPage] ⚠️ Session lost during redirect - checking localStorage...");
-          
-          // Check Supabase's localStorage keys
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-          if (supabaseUrl) {
-            const urlObj = new URL(supabaseUrl);
-            const projectRef = urlObj.hostname.split('.')[0];
-            const storageKey = `sb-${projectRef}-auth-token`;
-            const storedSession = localStorage.getItem(storageKey);
-            
-            if (storedSession) {
-              console.log("[SuccessPage] Found session in localStorage, attempting to restore...");
-              try {
-                // Force Supabase to recognize the stored session
-                const { data: forceSession } = await supabase.auth.getSession();
-                if (forceSession?.session?.user) {
-                  console.log("[SuccessPage] ✅ Session restored from localStorage:", forceSession.session.user.email);
-                  if (onSetUser) {
-                    onSetUser(forceSession.session.user);
-                  }
-                  return false;
-                }
-              } catch (err) {
-                console.error("[SuccessPage] Error restoring stored session:", err);
-              }
-            }
-          }
-        } catch (err) {
-          console.error("[SuccessPage] Error parsing saved user info:", err);
-        }
+      if (!savedUserInfo) {
+        console.error("[SuccessPage] ❌ No saved user info found");
+        setIsLoading(false);
+        setError("User information not found. Please log in again.");
+        return;
       }
       
-      return false;
-    };
-    
-    // Try immediately
-    restoreAndProceed().then((proceeded) => {
-      if (proceeded) return;
+      let userInfo;
+      try {
+        userInfo = JSON.parse(savedUserInfo);
+        console.log("[SuccessPage] Found saved user ID:", userInfo.id, userInfo.email);
+      } catch (err) {
+        console.error("[SuccessPage] Error parsing saved user info:", err);
+        setIsLoading(false);
+        setError("Invalid user information. Please log in again.");
+        return;
+      }
       
-      // If not proceeded, check every 500ms
-      checkInterval = window.setInterval(async () => {
-        const proceeded = await restoreAndProceed();
-        if (proceeded && checkInterval) {
-          clearInterval(checkInterval);
-        }
-      }, 500);
+      // Find Supabase session in localStorage
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        console.error("[SuccessPage] ❌ No Supabase URL configured");
+        setIsLoading(false);
+        setError("Configuration error. Please log in again.");
+        return;
+      }
       
-      // Timeout after 10 seconds
-      timeoutId = window.setTimeout(async () => {
-        if (checkInterval) clearInterval(checkInterval);
+      const urlObj = new URL(supabaseUrl);
+      const projectRef = urlObj.hostname.split('.')[0];
+      const storageKey = `sb-${projectRef}-auth-token`;
+      
+      console.log("[SuccessPage] Looking for Supabase session in localStorage:", storageKey);
+      const storedSession = localStorage.getItem(storageKey);
+      
+      if (!storedSession) {
+        console.error("[SuccessPage] ❌ No Supabase session found in localStorage");
+        setIsLoading(false);
+        setError("Session not found. Please log in again.");
+        return;
+      }
+      
+      console.log("[SuccessPage] Found Supabase session in localStorage, parsing...");
+      let sessionData;
+      try {
+        sessionData = JSON.parse(storedSession);
+      } catch (err) {
+        console.error("[SuccessPage] Error parsing session data:", err);
+        setIsLoading(false);
+        setError("Invalid session data. Please log in again.");
+        return;
+      }
+      
+      // Verify the session belongs to our saved user
+      if (sessionData?.user?.id !== userInfo.id) {
+        console.warn("[SuccessPage] ⚠️ Session user ID mismatch:", sessionData?.user?.id, "vs", userInfo.id);
+        // Still try to use it - might be a different format
+      }
+      
+      // Force Supabase to recognize the session by calling getSession multiple times
+      // Sometimes it needs a moment to initialize
+      console.log("[SuccessPage] Forcing Supabase to recognize session...");
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { data: sessionResult, error: sessionError } = await supabase.auth.getSession();
         
-        const finalCheck = await restoreAndProceed();
-        if (!finalCheck) {
+        if (sessionResult?.session?.user) {
+          console.log("[SuccessPage] ✅ Session restored on attempt", attempt + 1, ":", sessionResult.session.user.email);
+          if (onSetUser) {
+            onSetUser(sessionResult.session.user);
+          }
+          setIsLoading(false);
+          sessionStorage.removeItem("stripe-checkout-user");
+          
+          getSubscriptionStatus(sessionResult.session.user.id).then((status) => {
+            if (status) {
+              setSubscriptionStatus(status.plan);
+            }
+          }).catch((err) => {
+            console.warn("[SuccessPage] Error checking subscription:", err);
+          });
+          
+          setTimeout(() => {
+            window.localStorage.removeItem("actionmaps-projects-cache");
+            window.localStorage.removeItem("actionmaps-last-view");
+            onSetAppView("dashboard");
+            window.history.replaceState(null, "", window.location.pathname);
+          }, 2000);
+          return;
+        }
+        
+        if (attempt < 4) {
+          console.log(`[SuccessPage] Attempt ${attempt + 1} failed, retrying...`);
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        } else {
+          console.error("[SuccessPage] ❌ Failed to restore session after 5 attempts");
+          console.error("[SuccessPage] Session error:", sessionError?.message || "No error");
           setIsLoading(false);
           setError("Session could not be restored. Please log in again.");
-          console.error("[SuccessPage] ❌ Failed to restore session after all attempts");
         }
-      }, 10000);
-    });
-    
-    return () => {
-      if (checkInterval) clearInterval(checkInterval);
-      if (timeoutId) clearTimeout(timeoutId);
+      }
     };
+    
+    restoreSession();
   }, [user, onSetAppView, onSetUser]);
 
   return (
