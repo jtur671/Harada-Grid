@@ -16,6 +16,7 @@ You need to add these in **Cloudflare Dashboard** → **Workers & Pages** → **
 4. ❌ **`SUPABASE_URL`** - **MISSING!** (This is the problem)
 
 ### For Client-side (Vite):
+
 - `VITE_SUPABASE_URL` - Already set (for client-side code)
 - `VITE_SUPABASE_ANON_KEY` - Already set (for client-side code)
 
