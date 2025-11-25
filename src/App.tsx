@@ -85,6 +85,7 @@ const App: React.FC = () => {
   const autosaveTimeoutRef = useRef<number | null>(null); // Store timeout ID in ref
   const authHandlerTimeoutRef = useRef<number | null>(null); // Track auth handler timeout
   const autosaveLoggedRef = useRef<boolean>(false);
+  const lastProjectsLoadRef = useRef<number>(0); // Track when we last loaded projects
 
   const isLoggedIn = !!user;
   const adminEmail = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
@@ -112,6 +113,7 @@ const App: React.FC = () => {
     onViewModeChange: setViewMode,
     onStartModalChange: setStartModalOpen,
     hasDismissedStartModal,
+    currentAppView: appView, // Pass current view to prevent redirects
   });
 
   // Store updateProjectInList in ref to avoid dependency issues in autosave effect
@@ -614,6 +616,13 @@ const App: React.FC = () => {
               return currentView;
             }
             
+            // CRITICAL: Skip TOKEN_REFRESHED events after initialization - they happen constantly
+            // Only load projects on actual user changes or initial sign-in
+            if (authInitializedRef.current && (event === "TOKEN_REFRESHED" || event === "USER_UPDATED")) {
+              console.log("[Auth] Skipping loadProjects - token refresh after initialization (no user change)");
+              return currentView;
+            }
+            
             // Debounce project loading to avoid rapid calls
             authHandlerTimeoutRef.current = window.setTimeout(() => {
               authHandlerTimeoutRef.current = null;
@@ -625,7 +634,7 @@ const App: React.FC = () => {
                 // Just set view to success - it will handle the rest
                 setAppView("success");
                 
-                // Refresh subscription status and load projects in background
+                // Refresh subscription status and load projects in background (only once)
                 setTimeout(() => {
                   getSubscriptionStatus(u.id).then((status) => {
                     if (status) {
@@ -638,17 +647,20 @@ const App: React.FC = () => {
                 return;
               }
               
-              // If auth is already initialized, preserve view - just refresh projects
+              // If auth is already initialized, preserve view - just refresh projects ONCE
               if (authInitializedRef.current) {
-                loadProjectsForUser(u, true);
+                // Only load if we haven't loaded recently
+                const timeSinceLastLoad = Date.now() - lastProjectsLoadRef.current;
+                if (timeSinceLastLoad > 5000) { // Only if it's been 5+ seconds
+                  loadProjectsForUser(u, true);
+                } else {
+                  console.log("[Auth] Skipping loadProjects - loaded recently:", timeSinceLastLoad, "ms ago");
+                }
                 return;
               }
               
               // Only on initial sign-in (before authInitialized is true)
-              if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
-                // Token refresh or user update - just refresh projects, never change view
-                loadProjectsForUser(u, true);
-              } else if (event === "SIGNED_IN" && userChanged) {
+              if (event === "SIGNED_IN" && userChanged) {
                 // Only on actual sign in with user change (and only before initialization)
                 if (currentView === "home") {
                   // Only redirect from home, preserve all other views
@@ -657,9 +669,6 @@ const App: React.FC = () => {
                   // Already in builder/dashboard/etc - preserve it
                   loadProjectsForUser(u, true);
                 }
-              } else {
-                // For any other event, preserve view completely
-                loadProjectsForUser(u, true);
               }
             }, 150); // Debounce to prevent rapid calls
             

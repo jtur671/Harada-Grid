@@ -18,6 +18,7 @@ type UseProjectsOptions = {
   onViewModeChange?: (mode: "map" | "grid") => void;
   onStartModalChange?: (open: boolean) => void;
   hasDismissedStartModal: () => boolean;
+  currentAppView?: AppView; // Add current view to prevent redirects
 };
 
 export const useProjects = ({
@@ -27,6 +28,7 @@ export const useProjects = ({
   onViewChange,
   onViewModeChange,
   onStartModalChange,
+  currentAppView,
 }: UseProjectsOptions) => {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
@@ -142,10 +144,15 @@ export const useProjects = ({
       const justLoaded = timeSinceLoad < 2000; // Within last 2 seconds
       const hasProjects = list.length > 0;
       
-      // Only auto-redirect if: not preserving view, no current project, didn't just load, AND no existing projects
-      // If user has projects, they know how to navigate - don't force redirects
+      // CRITICAL: NEVER redirect if user is in builder view - they might be creating/editing a map
       // NEVER redirect if user is already on pricing page - they might be trying to upgrade
-      if (!preserveView && onViewChange && !currentProjectId && !justLoaded && !hasProjects) {
+      // NEVER redirect if user has projects - they know how to navigate
+      const isInBuilderView = currentAppView === "builder";
+      const isOnPricingPage = currentAppView === "pricing";
+      
+      // Only auto-redirect if: not preserving view, no current project, didn't just load, AND no existing projects
+      // AND not in builder view, AND not on pricing page
+      if (!preserveView && onViewChange && !currentProjectId && !justLoaded && !hasProjects && !isInBuilderView && !isOnPricingPage) {
         // Check current view - don't redirect if already on pricing
         const currentView = typeof window !== "undefined" ? 
           (window.localStorage.getItem("actionmaps-last-view") || "home") : "home";
