@@ -466,15 +466,38 @@ const App: React.FC = () => {
     
     // Load session FIRST, then handle redirects (including success page)
     // This ensures user is loaded before SuccessPage tries to use it
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data, error }) => {
       if (cancelled) return;
+      
+      if (error) {
+        console.error("[App] Error getting session:", error);
+      }
+      
       const current = data.session?.user ?? null;
+      console.log("[App] Initial session load:", current?.email || "no user", error?.message || "no error");
       setUser(current);
       
       // If Stripe success, redirect to success page AFTER loading session
       // This ensures user is available when SuccessPage renders
       if (isStripeSuccess || isSuccessHash) {
         console.log("[Stripe] Detected success, session loaded for user:", current?.email || "none");
+        
+        // If no user but we have saved user info, try one more time after a delay
+        if (!current) {
+          const savedUserInfo = sessionStorage.getItem("stripe-checkout-user");
+          if (savedUserInfo) {
+            console.log("[Stripe] No session but have saved user info, retrying getSession...");
+            setTimeout(() => {
+              supabase.auth.getSession().then(({ data: retryData }) => {
+                if (retryData?.session?.user && !cancelled) {
+                  console.log("[Stripe] ✅ Session found on retry:", retryData.session.user.email);
+                  setUser(retryData.session.user);
+                }
+              });
+            }, 1000);
+          }
+        }
+        
         // Clean up URL
         const cleanParams = new URLSearchParams(urlParams);
         cleanParams.delete("session_id");
@@ -486,7 +509,7 @@ const App: React.FC = () => {
           "",
           `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${cleanHash}`
         );
-        // Set view to success now that user is loaded
+        // Set view to success now that user is loaded (or will be loaded)
         setAppView("success");
         // Load subscription status and projects in background
         if (current) {

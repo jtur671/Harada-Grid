@@ -28,142 +28,99 @@ export const SuccessPage: React.FC<SuccessPageProps> = ({
   const [subscriptionStatus, setSubscriptionStatus] = useState<"free" | "premium" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // CRITICAL: Restore session after Stripe checkout
-  // Strategy:
-  // 1. Check for session_id from Stripe (in query params or hash)
-  // 2. Try to restore session from saved user info in sessionStorage
-  // 3. Try to get session from Supabase
-  // 4. If OAuth tokens are in hash, force Supabase to process them
+  // NEW APPROACH: Wait for App.tsx to load the session, then proceed
+  // App.tsx's initial getSession() should restore the session from localStorage
+  // We just need to wait for it and then redirect
   useEffect(() => {
     if (!window.location.hash.startsWith("#success")) {
       return;
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const sessionId = urlParams.get("session_id") || hashParams.get("session_id");
-    const hasOAuthTokens = hashParams.has("access_token");
+    console.log("[SuccessPage] Waiting for App.tsx to restore session...");
     
-    console.log("[SuccessPage] Stripe redirect detected:", { sessionId, hasOAuthTokens });
+    // Strategy: Wait for user to be set by App.tsx (which calls getSession on mount)
+    // If user is already set, proceed immediately
+    // Otherwise, wait up to 10 seconds for App.tsx to restore it
     
-    const restoreSession = async () => {
-      // If we already have a user, we're good
+    let checkInterval: number | null = null;
+    let timeoutId: number | null = null;
+    
+    const checkUserAndProceed = () => {
       if (user) {
-        console.log("[SuccessPage] ✅ User already in state:", user.email);
+        console.log("[SuccessPage] ✅ User found:", user.email);
         setIsLoading(false);
+        
+        // Clean up saved user info
+        sessionStorage.removeItem("stripe-checkout-user");
+        
+        // Check subscription status
+        getSubscriptionStatus(user.id).then((status) => {
+          if (status) {
+            setSubscriptionStatus(status.plan);
+          }
+        }).catch((err) => {
+          console.warn("[SuccessPage] Error checking subscription:", err);
+        });
+        
+        // Redirect to dashboard after 2 seconds
         setTimeout(() => {
           window.localStorage.removeItem("actionmaps-projects-cache");
           window.localStorage.removeItem("actionmaps-last-view");
           onSetAppView("dashboard");
           window.history.replaceState(null, "", window.location.pathname);
         }, 2000);
-        return;
-      }
-
-      // Try to restore from saved user info
-      const savedUserInfo = sessionStorage.getItem("stripe-checkout-user");
-      if (savedUserInfo) {
-        try {
-          const userInfo = JSON.parse(savedUserInfo);
-          console.log("[SuccessPage] Found saved user info:", userInfo.email);
-          
-          // Try to get session from Supabase
-          for (let attempt = 0; attempt < 5; attempt++) {
-            console.log(`[SuccessPage] Attempt ${attempt + 1}: Getting session...`);
-            
-            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-            
-            if (sessionData?.session?.user) {
-              console.log("[SuccessPage] ✅ Session restored:", sessionData.session.user.email);
-              if (onSetUser) {
-                onSetUser(sessionData.session.user);
-              }
-              setIsLoading(false);
-              
-              // Clean up saved user info
-              sessionStorage.removeItem("stripe-checkout-user");
-              
-              // Check subscription status
-              getSubscriptionStatus(sessionData.session.user.id).then((status) => {
-                if (status) {
-                  setSubscriptionStatus(status.plan);
-                }
-              }).catch((err) => {
-                console.warn("[SuccessPage] Error checking subscription:", err);
-              });
-              
-              // Redirect to dashboard after 2 seconds
-              setTimeout(() => {
-                window.localStorage.removeItem("actionmaps-projects-cache");
-                window.localStorage.removeItem("actionmaps-last-view");
-                onSetAppView("dashboard");
-                window.history.replaceState(null, "", window.location.pathname);
-              }, 2000);
-              return;
-            } else {
-              console.warn(`[SuccessPage] No session (attempt ${attempt + 1}):`, sessionError?.message || "No session");
-              if (attempt < 4) {
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-              }
-            }
-          }
-        } catch (err) {
-          console.error("[SuccessPage] Error parsing saved user info:", err);
-        }
-      }
-
-      // If OAuth tokens are in hash, force Supabase to process them
-      if (hasOAuthTokens) {
-        console.log("[SuccessPage] OAuth tokens detected - forcing Supabase to process them...");
         
-        for (let attempt = 0; attempt < 5; attempt++) {
-          console.log(`[SuccessPage] OAuth attempt ${attempt + 1}: Getting session...`);
-          
-          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-          
-          if (sessionData?.session?.user) {
-            console.log("[SuccessPage] ✅ Session found via OAuth:", sessionData.session.user.email);
-            if (onSetUser) {
-              onSetUser(sessionData.session.user);
-            }
-            setIsLoading(false);
-            
-            // Clean up saved user info
-            sessionStorage.removeItem("stripe-checkout-user");
-            
-            // Check subscription status
-            getSubscriptionStatus(sessionData.session.user.id).then((status) => {
-              if (status) {
-                setSubscriptionStatus(status.plan);
-              }
-            }).catch((err) => {
-              console.warn("[SuccessPage] Error checking subscription:", err);
-            });
-            
-            // Redirect to dashboard after 2 seconds
-            setTimeout(() => {
-              window.localStorage.removeItem("actionmaps-projects-cache");
-              window.localStorage.removeItem("actionmaps-last-view");
-              onSetAppView("dashboard");
-              window.history.replaceState(null, "", window.location.pathname);
-            }, 2000);
-            return;
-          } else {
-            console.warn(`[SuccessPage] No session via OAuth (attempt ${attempt + 1}):`, sessionError?.message || "No session");
-            if (attempt < 4) {
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-          }
-        }
+        // Clean up
+        if (checkInterval) clearInterval(checkInterval);
+        if (timeoutId) clearTimeout(timeoutId);
+        return true;
       }
-      
-      // If we get here, session wasn't restored
-      console.error("[SuccessPage] ❌ Failed to restore session");
-      setIsLoading(false);
-      setError("Session restoration failed. Please try logging in again.");
+      return false;
     };
-
-    restoreSession();
+    
+    // Check immediately
+    if (checkUserAndProceed()) {
+      return;
+    }
+    
+    // If no user yet, wait for App.tsx to restore it
+    // Check every 500ms
+    checkInterval = window.setInterval(() => {
+      if (checkUserAndProceed()) {
+        // Cleanup handled in checkUserAndProceed
+      }
+    }, 500);
+    
+    // Timeout after 10 seconds
+    timeoutId = window.setTimeout(() => {
+      if (checkInterval) clearInterval(checkInterval);
+      setIsLoading(false);
+      
+      // Last attempt: try to get session directly
+      supabase.auth.getSession().then(({ data: sessionData }) => {
+        if (sessionData?.session?.user) {
+          console.log("[SuccessPage] ✅ Found session on timeout:", sessionData.session.user.email);
+          if (onSetUser) {
+            onSetUser(sessionData.session.user);
+          }
+          // Proceed with redirect
+          setTimeout(() => {
+            window.localStorage.removeItem("actionmaps-projects-cache");
+            window.localStorage.removeItem("actionmaps-last-view");
+            onSetAppView("dashboard");
+            window.history.replaceState(null, "", window.location.pathname);
+          }, 2000);
+        } else {
+          console.error("[SuccessPage] ❌ No session found after timeout");
+          setError("Session not found. Please log in again.");
+        }
+      });
+    }, 10000);
+    
+    return () => {
+      if (checkInterval) clearInterval(checkInterval);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [user, onSetAppView, onSetUser]);
 
   return (
