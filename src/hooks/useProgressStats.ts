@@ -62,7 +62,9 @@ export const useProgressStats = (
             pillarDefined++;
             totalDefined++;
             const id = getTaskId(pIndex, tIndex);
-            if (progressForDay.includes(id)) {
+            // Use allCompletedTasks (cumulative) instead of progressForDay (today only)
+            // This ensures progress bar persists across days, matching the green blocks
+            if (allCompletedTasks.includes(id)) {
               pillarCompleted++;
               totalCompleted++;
             }
@@ -77,7 +79,7 @@ export const useProgressStats = (
         totalDefinedTasks: totalDefined,
         completedDefinedTasks: totalCompleted,
       };
-    }, [progressForDay, state.pillars, state.tasks]);
+    }, [allCompletedTasks, state.pillars, state.tasks]);
 
   const progressPercent =
     totalDefinedTasks === 0
