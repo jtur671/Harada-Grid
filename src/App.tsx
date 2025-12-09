@@ -883,7 +883,7 @@ const App: React.FC = () => {
       setViewMode("grid");
       
       // Close the modal on success
-      setAiModalOpen(false);
+    setAiModalOpen(false);
       setAiGoalText("");
     } catch (error) {
       // Show user-friendly error message
