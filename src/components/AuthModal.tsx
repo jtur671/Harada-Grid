@@ -70,26 +70,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleGoogleSignIn = async () => {
     setAuthError(null);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      // Get the current URL for redirect
+      const redirectTo = `${window.location.origin}${window.location.pathname}`;
+      
+      console.log("[Google OAuth] Initiating sign-in, redirectTo:", redirectTo);
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}${window.location.pathname}`,
+          redirectTo: redirectTo,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
           },
         },
       });
+      
       if (error) {
-        setAuthError(error.message);
-      } else {
+        console.error("[Google OAuth] Error:", error);
+        setAuthError(error.message || "Failed to initiate Google sign-in. Please check your Supabase configuration.");
+      } else if (data?.url) {
+        console.log("[Google OAuth] Redirecting to:", data.url);
         // Supabase will redirect to Google, then back to our app
         // onAuthStateChange in App.tsx will handle the session
         onClose();
+        // The redirect happens automatically via data.url
+      } else {
+        console.error("[Google OAuth] No redirect URL returned");
+        setAuthError("Failed to initiate Google sign-in. Please check your Supabase configuration.");
       }
     } catch (err) {
-      console.error("Google sign-in error:", err);
-      setAuthError("Failed to initiate Google sign-in. Please try again.");
+      console.error("[Google OAuth] Exception:", err);
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      setAuthError(`Failed to initiate Google sign-in: ${errorMessage}. Please verify your Supabase URL and that Google OAuth is enabled.`);
     }
   };
 
